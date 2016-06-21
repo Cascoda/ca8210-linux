@@ -26,7 +26,7 @@ The Linux kbuild system must be used to build the driver as a kernel module. Fro
 Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210 similar to the following:
 
 ca8210@**_chip select number_** {  
-&nbsp;&nbsp;&nbsp;&nbsp;compatible = "cascoda,ca8210";
+&nbsp;&nbsp;&nbsp;&nbsp;compatible = "cascoda,ca8210";  
 &nbsp;&nbsp;&nbsp;&nbsp;reg = <0>;  
 &nbsp;&nbsp;&nbsp;&nbsp;spi-max-frequency = <**_max of 4000000_**>;  
 &nbsp;&nbsp;&nbsp;&nbsp;spi-cpol;  
