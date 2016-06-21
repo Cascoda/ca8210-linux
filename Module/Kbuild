@@ -1,0 +1,3 @@
+# kbuild part of makefile
+obj-m := ca8210sm.o
+ca8210sm-objs = ca8210.o
