@@ -1,5 +1,7 @@
 # ca8210-linux
-Linux kernel drivers for Cascoda's CA-8210 IEEE 802.15.4 transceiver
+Linux kernel drivers for Cascoda's CA-8210 IEEE 802.15.4 transceiver.
+
+The master branch supports kernel 4.4.
 
 Building:
 The Linux kbuild system must be used to build the driver as a kernel module. From [kernel.org](https://www.kernel.org/doc/Documentation/kbuild/modules.txt):
@@ -19,7 +21,8 @@ The Linux kbuild system must be used to build the driver as a kernel module. Fro
 	"modules_install" to the command:
 
 	  $ make -C /lib/modules/`uname -r`/build M=$PWD modules_install
-	  
+	 
+---
 Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210 similar to the following:
 
 ca8210@**_chip select number_** {  
