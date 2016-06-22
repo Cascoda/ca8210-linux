@@ -32,7 +32,7 @@ ca8210@**_chip select number_** {
 &nbsp;&nbsp;&nbsp;&nbsp;spi-cpol;  
 &nbsp;&nbsp;&nbsp;&nbsp;reset-gpio = <&**_gpio bank and number_** GPIO_ACTIVE_HIGH>;  
 &nbsp;&nbsp;&nbsp;&nbsp;irq-gpio = <&**_gpio bank and number_** GPIO_ACTIVE_HIGH>;  
-&nbsp;&nbsp;&nbsp;&nbsp;extclock-enable **(if external clock provided by ca8210 is desired)**  
+&nbsp;&nbsp;&nbsp;&nbsp;extclock-enable; **(if external clock provided by ca8210 is desired)**  
 &nbsp;&nbsp;&nbsp;&nbsp;extclock-freq = <**_frequency as specified in ca8210 datasheet_**>;  
 &nbsp;&nbsp;&nbsp;&nbsp;extclock-gpio = <**_output gpio as specified in ca8210 datasheet_**>;  
 };
