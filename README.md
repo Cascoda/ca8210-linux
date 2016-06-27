@@ -21,7 +21,9 @@ The Linux kbuild system must be used to build the driver as a kernel module. Fro
 	"modules_install" to the command:
 
 	  $ make -C /lib/modules/`uname -r`/build M=$PWD modules_install
-	 
+The built module can be found at /lib/modules/<kernel version>/extra/**ca8210sm** and can be loaded with the command  
+```sudo modprobe ca8210sm```
+
 ---
 Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210 similar to the following:
 
