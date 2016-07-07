@@ -1842,7 +1842,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 			pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
 			spin_unlock(&priv->lock);
 			pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
-			mdelay(1);
+			msleep(1);
 		}
 	} while(1);
 
