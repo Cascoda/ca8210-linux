@@ -20,7 +20,7 @@ $ make -C /lib/modules/`uname -r`/build M=$PWD
 ```
 $ make -C /lib/modules/`uname -r`/build M=$PWD modules_install
 ```
-The built module can be found at /lib/modules/<kernel version>/extra/**ca8210sm** and can be loaded with the command  
+The built module can be found at /lib/modules/\`uname -r\`/extra/**ca8210sm** and can be loaded with the command  
 ```
 sudo modprobe ca8210sm
 ```
