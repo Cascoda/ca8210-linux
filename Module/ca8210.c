@@ -1827,8 +1827,6 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 
 	pr_debug("[ca8210] SPI read function -ca8210_spi_startRead- called\n");
 
-	memset(priv->cas_ctl.rx_buf, '\xff', SPI_BUF_SIZE);
-
 	do {
 		pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
@@ -1851,6 +1849,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 	if (down_interruptible(&priv->cas_ctl.spi_sem))
 		return;
 
+	memset(priv->cas_ctl.rx_buf, '\xff', SPI_BUF_SIZE);
 	memset(priv->cas_ctl.rx_out_buf, '\xff', SPI_BUF_SIZE);
 
 	/* Read the first 2 bytes: CMD and LENGTH */
