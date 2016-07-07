@@ -1406,7 +1406,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 	hw = ieee802154_alloc_hw(sizeof(struct ca8210_priv), &ca8210_phy_ops);
 	if (hw == NULL) {
 		pr_crit("[ca8210] ieee802154_alloc_hw failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto error;
 	}
 
 	priv = hw->priv;
@@ -1427,36 +1428,37 @@ static int ca8210_probe(struct spi_device *spi_device)
 	ret = ieee802154_register_hw(hw);
 	if (ret) {
 		pr_crit("[ca8210] ieee802154_register_hw failed\n");
-		return ret;
+		goto error;
 	}
 
 	pdata = kmalloc(sizeof(struct ca8210_platform_data), GFP_KERNEL);
 	if (pdata == NULL) {
 		pr_crit("[ca8210] Could not allocate platform data\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto error;
 	}
 
 	ret = ca8210_get_platform_data(priv->spi, pdata);
 	if (ret) {
 		pr_crit("[ca8210] ca8210_get_platform_data failed\n");
-		return ret;
+		goto error;
 	}
 	priv->spi->dev.platform_data = pdata;
 
 	ret = ca8210_dev_com_init(priv);
 	if (ret) {
 		pr_crit("[ca8210] ca8210_dev_com_init failed\n");
-		return ret;
+		goto error;
 	}
 	ret = ca8210_reset_init(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] ca8210_reset_init failed\n");
-		return ret;
+		goto error;
 	}
 	ret = ca8210_interrupt_init(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] ca8210_interrupt_init failed\n");
-		return ret;
+		goto error;
 	}
 
 	mdelay(500);	/* TODO: Check if this is still necessary */
@@ -1465,7 +1467,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	ret = TDME_ChipInit(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] TDME_ChipInit failed\n");
-		return ret;
+		goto error;
 	}
 
 	// EVBMEInitialise(FUNCTION_VERSION, spi_device);
@@ -1474,18 +1476,21 @@ static int ca8210_probe(struct spi_device *spi_device)
 		ret = ca8210_config_extern_clk(pdata, priv->spi, 1);
 		if (ret) {
 			pr_crit("[ca8210] ca8210_config_extern_clk failed\n");
-			return ret;
+			goto error;
 		}
 		ret = ca8210_register_ext_clock(priv->spi);
 		if (ret) {
 			pr_crit("[ca8210] ca8210_register_ext_clock failed\n");
-			return ret;
+			goto error;
 		}
 	}
 
 	// phy_test_task = kthread_run(&TEST15_4_PHY_Handler, spi_device, "ca8210_phy_test_worker");
 
 	return 0;
+error:
+	ca8210_remove(spi_device);
+	return link_to_linux_err(ret);
 }
 
 /**
