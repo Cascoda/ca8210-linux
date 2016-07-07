@@ -3101,7 +3101,7 @@ static uint8_t TDME_ChipInit(void *pDeviceRef)
 } // End of TDME_ChipInit()
 
 /**
- * TDME_ChipInit() - TDME Chip Register Default Initialisation Macro
+ * TDME_ChannelInit() - TDME Channel Register Default Initialisation Macro (Tx)
  * @channel:    802.15.4 channel to initialise chip for
  * @pDeviceRef: Nondescript pointer to target device
  *
