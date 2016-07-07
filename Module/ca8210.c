@@ -1455,15 +1455,16 @@ static int ca8210_probe(struct spi_device *spi_device)
 		pr_crit("[ca8210] ca8210_reset_init failed\n");
 		goto error;
 	}
+
+	ca8210_reset_send(priv->spi, 50);
+
 	ret = ca8210_interrupt_init(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] ca8210_interrupt_init failed\n");
 		goto error;
 	}
 
-	mdelay(500);	/* TODO: Check if this is still necessary */
-	ca8210_reset_send(priv->spi, 50);
-	mdelay(500);	/* TODO: Check if this is still necessary */
+	mdelay(500);	/* Time to process wakeup indication */
 	ret = TDME_ChipInit(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] TDME_ChipInit failed\n");
