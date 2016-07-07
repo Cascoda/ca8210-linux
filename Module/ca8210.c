@@ -1464,7 +1464,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 
-	mdelay(500);	/* Time to process wakeup indication */
+	mdelay(1000);	/* Time to process wakeup indication */
 	ret = TDME_ChipInit(priv->spi);
 	if (ret) {
 		pr_crit("[ca8210] TDME_ChipInit failed\n");
