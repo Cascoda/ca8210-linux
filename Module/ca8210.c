@@ -1055,7 +1055,7 @@ static int ca8210_config_extern_clk(
 static int ca8210_register_ext_clock(struct spi_device *spi)
 {
 	struct device_node *np = spi->dev.of_node;
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	int ret = 0;
 
@@ -1090,7 +1090,7 @@ static int ca8210_register_ext_clock(struct spi_device *spi)
  */
 static void ca8210_unregister_ext_clock(struct spi_device *spi)
 {
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 
 	if (priv->clk == NULL)
 		return
@@ -1151,7 +1151,7 @@ static int ca8210_interrupt_init(struct spi_device *spi)
 	                  ca8210_interrupt_handler,
 	                  IRQF_TRIGGER_FALLING,
 	                  "ca8210-irq",
-	                  spi->dev.driver_data);
+	                  spi_get_drvdata(spi));
 	if (ret) {
 		pr_crit("[ca8210] request_irq %d failed\n", pdata->irq_id);
 		gpio_unexport(pdata->gpio_irq);
@@ -1668,7 +1668,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	int status = 0;
 	int i;
 	bool dummy;
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
@@ -1813,7 +1813,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 static void ca8210_spi_startRead(struct spi_device *spi)
 {
 	int status;
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned cpu = smp_processor_id();
 
 	pr_debug("[ca8210] SPI read function -ca8210_spi_startRead- called\n");
@@ -1873,7 +1873,7 @@ static void ca8210_spi_continueRead(void *arg)
 {
 	int status;
 	struct spi_device *spi = arg;
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 
 	pr_debug("[ca8210] SPI read function -ca8210_spi_continueRead- called\n");
 
@@ -1946,7 +1946,7 @@ static void ca8210_spi_finishRead(void *arg)
 {
 	int i;
 	struct spi_device *spi = arg;
-	struct ca8210_priv *priv = spi->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
@@ -2778,7 +2778,7 @@ static ssize_t ca8210_test_int_user_read(struct file *filp, char __user *buf, si
  */
 static int ca8210_test_int_driver_write(const uint8_t *buf, size_t len, void *spi)
 {
-	struct ca8210_priv *priv = ((struct spi_device*)spi)->dev.driver_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_test *test = &priv->test;
 	char *fifo_buffer;
 	int i;
