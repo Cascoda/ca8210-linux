@@ -66,7 +66,7 @@
 
 /* spi constants */
 #define SPI_BUF_SIZE 256
-#define SPI_T_TIMEOUT 500     // Timeout for NACKs [ms]
+#define SPI_T_TIMEOUT 500     /* Timeout for NACKs [ms] */
 
 /* api constants */
 #define DATA_CNF_TIMEOUT_MS 300
@@ -1471,8 +1471,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 
-	// EVBMEInitialise(FUNCTION_VERSION, spi_device);
-
 	if (pdata->extclockenable) {
 		ret = ca8210_config_extern_clk(pdata, priv->spi, 1);
 		if (ret) {
@@ -1485,8 +1483,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 			goto error;
 		}
 	}
-
-	// phy_test_task = kthread_run(&TEST15_4_PHY_Handler, spi_device, "ca8210_phy_test_worker");
 
 	return 0;
 error:
@@ -1506,9 +1502,6 @@ static int ca8210_remove(struct spi_device *spi_device)
 	struct ca8210_platform_data *pdata;
 
 	pr_info("[ca8210] Removing SPI protocol driver\n");
-
-	// if (phy_test_task)
-	// 	kthread_stop(phy_test_task);
 
 	pdata = spi_device->dev.platform_data;
 	if (pdata) {
@@ -1808,7 +1801,6 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	}
 	ca8210_spi_writeDummy(spi);
 	up(&priv->cas_ctl.spi_sem);
-	// local_irq_restore(flags);
 	return status;
 }
 
@@ -2039,13 +2031,6 @@ static void ca8210_rx_done(struct work_struct *work)
 	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
 	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
-
-	/* TODO: Deal with this */
-	// if (priv->clear_next_spi_rx) {
-	// 	SPI_Receive.CommandId = 0xFF;
-	// 	SPI_Receive.Length = 0xFF;
-	// 	priv->clear_next_spi_rx = false;
-	// }
 
 	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
@@ -2846,7 +2831,7 @@ static uint8_t MCPS_DATA_request(
 		if (DstAddrMode == MAC_MODE_SHORT_ADDR) {
 			DATAREQ.Dst.Address[0] = LS_BYTE(pDstAddr->ShortAddress);
 			DATAREQ.Dst.Address[1] = MS_BYTE(pDstAddr->ShortAddress);
-		} else {   // MAC_MODE_LONG_ADDR
+		} else {   /* MAC_MODE_LONG_ADDR*/
 			memcpy(DATAREQ.Dst.Address, pDstAddr->IEEEAddress, 8);
 		}
 	}
@@ -2869,7 +2854,7 @@ static uint8_t MCPS_DATA_request(
 
 	return MAC_SUCCESS;
 	#undef DATAREQ
-} // End of MCPS_DATA_request()
+}
 
 /**
  * MLME_RESET_request_sync() - MLME_RESET_request/confirm according to API Spec
@@ -2903,7 +2888,7 @@ static uint8_t MLME_RESET_request_sync(uint8_t SetDefaultPIB, void *pDeviceRef)
 	return status;
 	#undef SIMPLEREQ
 	#undef SIMPLECNF
-} // End of MLME_RESET_request_sync()
+}
 
 /**
  * MLME_SET_request_sync() - MLME_SET_request/confirm according to API Spec
@@ -2957,7 +2942,7 @@ static uint8_t MLME_SET_request_sync(
 	return SIMPLECNF.Status;
 	#undef SETREQ
 	#undef SIMPLECNF
-} // End of MLME_SET_request_sync()
+}
 
 /**
  * HWME_SET_request_sync() - HWME_SET_request/confirm according to API Spec
@@ -2989,7 +2974,7 @@ static uint8_t HWME_SET_request_sync(
 		return MAC_SYSTEM_ERROR;
 
 	return Response.PData.HWMESetCnf.Status;
-} // End of HWME_SET_request_sync()
+}
 
 /**
  * HWME_GET_request_sync() - HWME_GET_request/confirm according to API Spec
@@ -3024,7 +3009,7 @@ static uint8_t HWME_GET_request_sync(
 	}
 
 	return Response.PData.HWMEGetCnf.Status;
-} // End of HWME_GET_request_sync()
+}
 
 /**
  * TDME_SETSFR_request_sync() - TDME_SETSFR_request/confirm according to API Spec
@@ -3062,7 +3047,7 @@ static uint8_t TDME_SETSFR_request_sync(
 	}
 
 	return Response.PData.TDMESetSFRCnf.Status;
-} // End of TDME_SETSFR_request_sync()
+}
 
 /**
  * TDME_ChipInit() - TDME Chip Register Default Initialisation Macro
@@ -3074,7 +3059,7 @@ static uint8_t TDME_ChipInit(void *pDeviceRef)
 {
 	uint8_t status;
 
-	if((status = TDME_SETSFR_request_sync(1, 0xE1, 0x29, pDeviceRef)))  // LNA Gain Settings
+	if((status = TDME_SETSFR_request_sync(1, 0xE1, 0x29, pDeviceRef)))  /* LNA Gain Settings */
 		return(status);
 	if((status = TDME_SETSFR_request_sync(1, 0xE2, 0x54, pDeviceRef)))
 		return(status);
@@ -3090,15 +3075,15 @@ static uint8_t TDME_ChipInit(void *pDeviceRef)
 		return(status);
 	if((status = TDME_SETSFR_request_sync(1, 0xE9, 0x96, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xD3, 0x5B, pDeviceRef))) // Preamble Timing Config
+	if((status = TDME_SETSFR_request_sync(1, 0xD3, 0x5B, pDeviceRef))) /* Preamble Timing Config */
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xD1, 0x5A, pDeviceRef))) // Preamble Threshold High
+	if((status = TDME_SETSFR_request_sync(1, 0xD1, 0x5A, pDeviceRef))) /* Preamble Threshold High */
 		return(status);
-	if((status = TDME_SETSFR_request_sync(0, 0xFE, 0x3F, pDeviceRef))) // Tx Output Power 8 dBm
+	if((status = TDME_SETSFR_request_sync(0, 0xFE, 0x3F, pDeviceRef))) /* Tx Output Power 8 dBm */
 		return(status);
 
 	return MAC_SUCCESS;
-} // End of TDME_ChipInit()
+}
 
 /**
  * TDME_ChannelInit() - TDME Channel Register Default Initialisation Macro (Tx)
@@ -3131,8 +3116,8 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *pDeviceRef)
 		txcalval = 0xAF;
 	}
 
-	return TDME_SETSFR_request_sync(1, 0xBF, txcalval, pDeviceRef);  // LO Tx Cal
-} // End of TDME_ChannelInit()
+	return TDME_SETSFR_request_sync(1, 0xBF, txcalval, pDeviceRef);  /* LO Tx Cal */
+}
 
 /**
  * TDME_CheckPIBAttribute() - Checks Attribute Values that are not checked in
