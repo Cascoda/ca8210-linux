@@ -1624,6 +1624,7 @@ static int ca8210_spi_exchange(
 			mutex_unlock(&priv->sync_command_mutex);
 			currentjiffies = jiffies;
 			if ((currentjiffies - startjiffies) > msecs_to_jiffies(SPI_T_TIMEOUT)) {
+				pr_err("[ca8210] Synchronous confirm timeout\n");
 				return -ETIME;
 			}
 		}
