@@ -1014,7 +1014,7 @@ static int ca8210_config_extern_clk(
 	uint8_t clkparam[2];
 
 	if (on) {
-		pr_info("[ca8210] Switching external clock on\n");
+		dev_info(&spi->dev, "Switching external clock on\n");
 		switch (pdata->extclockfreq) {
 		case SIXTEEN_MHZ:
 			clkparam[0] = 1;
@@ -1032,12 +1032,12 @@ static int ca8210_config_extern_clk(
 			clkparam[0] = 5;
 			break;
 		default:
-			pr_crit("[ca8210] Invalid extclock-freq\n");
+			dev_crit(&spi->dev, "Invalid extclock-freq\n");
 			return -EINVAL;
 		}
 		clkparam[1] = pdata->extclockgpio;
 	} else {
-		pr_info("[ca8210] Switching external clock off\n");
+		dev_info(&spi->dev, "Switching external clock off\n");
 		clkparam[0] = 0; /* off */
 		clkparam[1] = 0;
 	}
@@ -1069,15 +1069,15 @@ static int ca8210_register_ext_clock(struct spi_device *spi)
 	                                    pdata->extclockfreq);
 
 	if (IS_ERR(priv->clk)) {
-		pr_crit("[ca8210] Failed to register external clk\n");
+		dev_crit(&spi->dev, "Failed to register external clk\n");
 		return PTR_ERR(priv->clk);
 	}
 	ret = of_clk_add_provider(np, of_clk_src_simple_get, priv->clk);
 	if (ret) {
 		clk_unregister(priv->clk);
-		pr_crit("[ca8210] Failed to register external clock as clock provider\n");
+		dev_crit(&spi->dev, "Failed to register external clock as clock provider\n");
 	} else {
-		pr_info("[ca8210] External clock set as clock provider\n");
+		dev_info(&spi->dev, "External clock set as clock provider\n");
 	}
 
 	return ret;
@@ -1097,7 +1097,7 @@ static void ca8210_unregister_ext_clock(struct spi_device *spi)
 
 	of_clk_del_provider(spi->dev.of_node);
 	clk_unregister(priv->clk);
-	pr_info("[ca8210] External clock unregistered\n");
+	dev_info(&spi->dev, "External clock unregistered\n");
 }
 
 /**
@@ -1117,7 +1117,7 @@ static int ca8210_reset_init(struct spi_device *spi)
 
 	ret = gpio_direction_output(pdata->gpio_reset, 1);
 	if (ret < 0) {
-		pr_crit("[ca8210] Reset GPIO %d did not set to output mode\n",
+		dev_crit(&spi->dev, "Reset GPIO %d did not set to output mode\n",
 			pdata->gpio_reset);
 	}
 
@@ -1141,7 +1141,7 @@ static int ca8210_interrupt_init(struct spi_device *spi)
 
 	pdata->irq_id = gpio_to_irq(pdata->gpio_irq);
 	if (pdata->irq_id < 0){
-		pr_crit("[ca8210] Could not get irq for gpio pin %d\n",
+		dev_crit(&spi->dev, "Could not get irq for gpio pin %d\n",
 			pdata->gpio_irq);
 		gpio_free(pdata->gpio_irq);
 		return pdata->irq_id;
@@ -1153,7 +1153,7 @@ static int ca8210_interrupt_init(struct spi_device *spi)
 	                  "ca8210-irq",
 	                  spi_get_drvdata(spi));
 	if (ret) {
-		pr_crit("[ca8210] request_irq %d failed\n", pdata->irq_id);
+		dev_crit(&spi->dev, "request_irq %d failed\n", pdata->irq_id);
 		gpio_unexport(pdata->gpio_irq);
 		gpio_free(pdata->gpio_irq);
 	}
@@ -1219,7 +1219,7 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 
 	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", 0);
 	if (priv->rx_workqueue == NULL) {
-		pr_crit("[ca8210] alloc of rx_workqueue failed!\n");
+		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
 	}
 	INIT_WORK(&priv->rx_work, ca8210_rx_done);
 	INIT_WORK(&priv->irq_work, ca8210_irq_worker);
@@ -1336,7 +1336,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 
 	status = alloc_chrdev_region(&test->char_dev_num, 0, 1, TEST_INT_FILE_NAME);
 	if(status < 0){
-		pr_crit("[ca8210] test_interface: Could not allocate a major number\n");
+		dev_crit(&priv->spi->dev, "test_interface: Could not allocate a major number\n");
 		return status;
 	}
 
@@ -1346,7 +1346,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 	status = cdev_add(&test->char_dev_cdev, test->char_dev_num, 1);
 	if(status < 0){
 		unregister_chrdev_region(test->char_dev_num, 1);
-		pr_crit("[ca8210] test_interface: Unable to register char dev\n");
+		dev_crit(&priv->spi->dev, "test_interface: Unable to register char dev\n");
 		return status;
 	}
 
@@ -1355,7 +1355,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		cdev_del(&test->char_dev_cdev);
 		unregister_chrdev_region(test->char_dev_num, 1);
 
-		pr_crit("[ca8210] test_interface: Could not create device class\n");
+		dev_crit(&priv->spi->dev, "test_interface: Could not create device class\n");
 		return PTR_ERR(test->cl);
 	}
 
@@ -1365,7 +1365,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		unregister_chrdev_region(test->char_dev_num, 1);
 		class_destroy(test->cl);
 
-		pr_crit("[ca8210] test_interface: Could not create device\n");
+		dev_crit(&priv->spi->dev, "test_interface: Could not create device\n");
 		return PTR_ERR(test->de);
 	}
 
@@ -1384,7 +1384,7 @@ static void ca8210_test_interface_clear(struct ca8210_priv *priv)
 	device_destroy(test->cl, test->char_dev_num);
 	class_destroy(test->cl);
 	kfifo_free(&test->up_fifo);
-	pr_info("[ca8210] Test interface removed\n");
+	dev_info(&priv->spi->dev, "Test interface removed\n");
 }
 
 /**
@@ -1400,12 +1400,12 @@ static int ca8210_probe(struct spi_device *spi_device)
 	struct ca8210_platform_data *pdata;
 	int ret;
 
-	pr_info("[ca8210] Inserting SPI protocol driver\n");
+	dev_info(&spi_device->dev, "Inserting SPI protocol driver\n");
 
 	/* allocate ieee802154_hw and private data */
 	hw = ieee802154_alloc_hw(sizeof(struct ca8210_priv), &ca8210_phy_ops);
 	if (hw == NULL) {
-		pr_crit("[ca8210] ieee802154_alloc_hw failed\n");
+		dev_crit(&spi_device->dev, "ieee802154_alloc_hw failed\n");
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -1427,32 +1427,32 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	ret = ieee802154_register_hw(hw);
 	if (ret) {
-		pr_crit("[ca8210] ieee802154_register_hw failed\n");
+		dev_crit(&spi_device->dev, "ieee802154_register_hw failed\n");
 		goto error;
 	}
 
 	pdata = kmalloc(sizeof(struct ca8210_platform_data), GFP_KERNEL);
 	if (pdata == NULL) {
-		pr_crit("[ca8210] Could not allocate platform data\n");
+		dev_crit(&spi_device->dev, "Could not allocate platform data\n");
 		ret = -ENOMEM;
 		goto error;
 	}
 
 	ret = ca8210_get_platform_data(priv->spi, pdata);
 	if (ret) {
-		pr_crit("[ca8210] ca8210_get_platform_data failed\n");
+		dev_crit(&spi_device->dev, "ca8210_get_platform_data failed\n");
 		goto error;
 	}
 	priv->spi->dev.platform_data = pdata;
 
 	ret = ca8210_dev_com_init(priv);
 	if (ret) {
-		pr_crit("[ca8210] ca8210_dev_com_init failed\n");
+		dev_crit(&spi_device->dev, "ca8210_dev_com_init failed\n");
 		goto error;
 	}
 	ret = ca8210_reset_init(priv->spi);
 	if (ret) {
-		pr_crit("[ca8210] ca8210_reset_init failed\n");
+		dev_crit(&spi_device->dev, "ca8210_reset_init failed\n");
 		goto error;
 	}
 
@@ -1460,26 +1460,26 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	ret = ca8210_interrupt_init(priv->spi);
 	if (ret) {
-		pr_crit("[ca8210] ca8210_interrupt_init failed\n");
+		dev_crit(&spi_device->dev, "ca8210_interrupt_init failed\n");
 		goto error;
 	}
 
 	mdelay(1000);	/* Time to process wakeup indication */
 	ret = TDME_ChipInit(priv->spi);
 	if (ret) {
-		pr_crit("[ca8210] TDME_ChipInit failed\n");
+		dev_crit(&spi_device->dev, "TDME_ChipInit failed\n");
 		goto error;
 	}
 
 	if (pdata->extclockenable) {
 		ret = ca8210_config_extern_clk(pdata, priv->spi, 1);
 		if (ret) {
-			pr_crit("[ca8210] ca8210_config_extern_clk failed\n");
+			dev_crit(&spi_device->dev, "ca8210_config_extern_clk failed\n");
 			goto error;
 		}
 		ret = ca8210_register_ext_clock(priv->spi);
 		if (ret) {
-			pr_crit("[ca8210] ca8210_register_ext_clock failed\n");
+			dev_crit(&spi_device->dev, "ca8210_register_ext_clock failed\n");
 			goto error;
 		}
 	}
@@ -1501,7 +1501,7 @@ static int ca8210_remove(struct spi_device *spi_device)
 	struct ca8210_priv *priv;
 	struct ca8210_platform_data *pdata;
 
-	pr_info("[ca8210] Removing SPI protocol driver\n");
+	dev_info(&spi_device->dev, "Removing SPI protocol driver\n");
 
 	pdata = spi_device->dev.platform_data;
 	if (pdata) {
@@ -1521,7 +1521,7 @@ static int ca8210_remove(struct spi_device *spi_device)
 			ieee802154_unregister_hw(priv->hw);
 			ieee802154_free_hw(priv->hw);
 			priv->hw = NULL;
-			pr_info("[ca8210] Unregistered & freed ieee802154_hw.\n");
+			dev_info(&spi_device->dev, "Unregistered & freed ieee802154_hw.\n");
 		}
 		ca8210_test_interface_clear(priv);
 	}
@@ -1547,7 +1547,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 {
 	struct ca8210_priv *priv = dev_id;
 
-	pr_debug("[ca8210] irq: Interrupt occured\n");
+	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
 
 	queue_work(priv->rx_workqueue, &priv->irq_work);
 
@@ -1579,7 +1579,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, RESET_ON);
-	pr_debug("[ca8210] Reset the device\n");
+	dev_dbg(&spi->dev, "Reset the device\n");
 	#undef RESET_OFF
 	#undef RESET_ON
 }
@@ -1624,7 +1624,7 @@ static int ca8210_spi_exchange(
 			mutex_unlock(&priv->sync_command_mutex);
 			currentjiffies = jiffies;
 			if ((currentjiffies - startjiffies) > msecs_to_jiffies(SPI_T_TIMEOUT)) {
-				pr_err("[ca8210] Synchronous confirm timeout\n");
+				dev_err(&spi->dev, "Synchronous confirm timeout\n");
 				return -ETIME;
 			}
 		}
@@ -1652,9 +1652,9 @@ static int ca8210_spi_writeDummy(struct spi_device *spi)
 	int ret;
 	uint8_t idle = 0xFF;
 
-	pr_debug("[ca8210] spi: writing dummy packet\n");
+	dev_dbg(&spi->dev, "spi: writing dummy packet\n");
 	ret =  ca8210_spi_write(spi, &idle, 1);
-	pr_debug("[ca8210] spi: wrote dummy packet\n");
+	dev_dbg(&spi->dev, "spi: wrote dummy packet\n");
 	return ret;
 }
 
@@ -1676,7 +1676,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	unsigned cpu = smp_processor_id();
 
 	if (spi == NULL) {
-		pr_crit("[ca8210] NULL spi device passed to ca8210_spi_write\n");
+		dev_crit(&spi->dev, "NULL spi device passed to ca8210_spi_write\n");
 		return -ENODEV;
 	}
 
@@ -1691,18 +1691,18 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		}
 	}
 
-	pr_debug("[ca8210] SPI write function -ca8210_spi_write- called\n");
+	dev_dbg(&spi->dev, "SPI write function -ca8210_spi_write- called\n");
 
 	/* Set in/out buffers to idle, copy over data to send */
 	memset(priv->cas_ctl.tx_buf, 0xFF, SPI_BUF_SIZE);
 	memset(priv->cas_ctl.tx_in_buf, 0xFF, SPI_BUF_SIZE);
 	memcpy(priv->cas_ctl.tx_buf, buf, len);
 
-	pr_debug("[ca8210] device_comm: Command ID = %#03x Length = %#03x	Data:\n",
+	dev_dbg(&spi->dev, "device_comm: Command ID = %#03x Length = %#03x	Data:\n",
 		priv->cas_ctl.tx_buf[0], priv->cas_ctl.tx_buf[1]);
 
 	for (i = 2; i < len; i++) {
-		pr_debug("%#03x\n", priv->cas_ctl.tx_buf[i]);
+		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_buf[i]);
 	}
 
 	#define SPLIT_TX_LEN 64
@@ -1735,7 +1735,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 
 		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
 		if(status < 0) {
-			pr_crit("[ca8210] Status %d from spi_sync in write\n", status);
+			dev_crit(&spi->dev, "Status %d from spi_sync in write\n", status);
 		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == '\xF0') {
 			/* ca8210 is busy */
 			ca8210_spi_writeDummy(spi);
@@ -1749,29 +1749,29 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	if (dummy)
 		return status;
 
-	pr_debug("[ca8210] spi received during transfer:\n");
+	dev_dbg(&spi->dev, "spi received during transfer:\n");
 	for (i = 0; i < len; i++) {
-		pr_debug("%#03x\n", priv->cas_ctl.tx_in_buf[i]);
+		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_in_buf[i]);
 	}
 
 	if (priv->cas_ctl.tx_in_buf[0] != 0xFF /* Not idle */ &&
 	    priv->cas_ctl.tx_in_buf[0] != 0xF0 /* Not NACK */) {
 		/* Received start of rx packet during transfer */
-		pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
-		pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 		priv->clear_next_spi_rx = true;
 
-		pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 		spin_unlock(&priv->lock);
-		pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 		#define NUM_DATABYTES_SO_FAR (len-2)
 		if (priv->cas_ctl.tx_in_buf[1] > NUM_DATABYTES_SO_FAR) {
 			/* Need to read rest of data of packet */
 			/* Buffer what we have so far and set up the rest of the transfer */
-			pr_debug("[ca8210] READ CMDID & LEN DURING TX, NEED TO READ REST OF DATA\n");
+			dev_dbg(&spi->dev, "READ CMDID & LEN DURING TX, NEED TO READ REST OF DATA\n");
 			memcpy(priv->cas_ctl.rx_final_buf, &priv->cas_ctl.tx_in_buf[0], 2);
 			memcpy(priv->cas_ctl.rx_buf, &priv->cas_ctl.tx_in_buf[2], NUM_DATABYTES_SO_FAR);
 			priv->cas_ctl.rx_transfer.len = priv->cas_ctl.tx_in_buf[1] - NUM_DATABYTES_SO_FAR;
@@ -1786,13 +1786,13 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 			status = spi_async(spi, &priv->cas_ctl.rx_msg);
 
 			if (status) {
-				pr_crit("[ca8210] Status %d from spi_async in write\n", status);
+				dev_crit(&spi->dev, "Status %d from spi_async in write\n", status);
 			}
 			local_irq_restore(flags);
 			return status;
 		}
 		else {
-			pr_debug("[ca8210] READ WHOLE CMD DURING TX\n");
+			dev_dbg(&spi->dev, "READ WHOLE CMD DURING TX\n");
 			/* whole packet read during transfer */
 			memcpy(priv->cas_ctl.rx_final_buf, priv->cas_ctl.tx_in_buf, SPI_BUF_SIZE);
 			INIT_WORK(&priv->rx_work, ca8210_rx_done);
@@ -1818,23 +1818,23 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned cpu = smp_processor_id();
 
-	pr_debug("[ca8210] SPI read function -ca8210_spi_startRead- called\n");
+	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_startRead- called\n");
 
 	do {
-		pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
-		pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (priv->cas_ctl.rx_final_buf[0] == 0xFF) {
 			/* spi receive buffer cleared of last rx */
-			pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 			spin_unlock(&priv->lock);
-			pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			break;
 		} else {
 			/* spi receive buffer still in use */
-			pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 			spin_unlock(&priv->lock);
-			pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			msleep(1);
 		}
 	} while(1);
@@ -1858,7 +1858,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 
 	status = spi_async(spi, &priv->cas_ctl.rx_msg);
 	if (status) {
-		pr_crit("[ca8210] Status %d from spi_async in start read\n", status);
+		dev_crit(&spi->dev, "Status %d from spi_async in start read\n", status);
 	}
 }
 
@@ -1876,7 +1876,7 @@ static void ca8210_spi_continueRead(void *arg)
 	struct spi_device *spi = arg;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 
-	pr_debug("[ca8210] SPI read function -ca8210_spi_continueRead- called\n");
+	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_continueRead- called\n");
 
 	spi_message_init(&priv->cas_ctl.rx_msg);
 	priv->cas_ctl.rx_msg.spi = spi;
@@ -1886,7 +1886,7 @@ static void ca8210_spi_continueRead(void *arg)
 		/* Start of data read */
 		priv->cas_ctl.data_received_so_far = 0;
 
-		pr_debug("[ca8210] spi received cmdid: %d, len: %d\n",
+		dev_dbg(&spi->dev, "spi received cmdid: %d, len: %d\n",
 			priv->cas_ctl.rx_buf[0], priv->cas_ctl.rx_buf[1]);
 		if ( (priv->cas_ctl.rx_buf[0] == 0xFF /* IDLE */) ||
 		     (priv->cas_ctl.rx_buf[0] == 0xF0 /* NACK */) ) {
@@ -1931,7 +1931,7 @@ static void ca8210_spi_continueRead(void *arg)
 	status = spi_async(spi, &priv->cas_ctl.rx_msg);
 
 	if (status) {
-		pr_crit("[ca8210] Status %d from spi_async in continue read\n", status);
+		dev_crit(&spi->dev, "Status %d from spi_async in continue read\n", status);
 	}
 }
 
@@ -1951,32 +1951,32 @@ static void ca8210_spi_finishRead(void *arg)
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
-	pr_debug("[ca8210] SPI read function -ca8210_spi_finishRead- called\n");
+	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_finishRead- called\n");
 
 	up(&priv->cas_ctl.spi_sem);
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	for (i = 0; i < priv->cas_ctl.rx_final_buf[1]; i++) {
 		priv->cas_ctl.rx_final_buf[2+i] = priv->cas_ctl.rx_buf[i];
 	}
 
-	pr_debug("[ca8210] device_comm: Command ID = %#03x Length = %#03x	Data:",
+	dev_dbg(&spi->dev, "device_comm: Command ID = %#03x Length = %#03x	Data:",
 		priv->cas_ctl.rx_final_buf[0], priv->cas_ctl.rx_final_buf[1]);
 
 	for (i = 2; i < priv->cas_ctl.rx_final_buf[1] + 2; i++) {
-		pr_debug("%#03x\n", priv->cas_ctl.rx_final_buf[i]);
+		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.rx_final_buf[i]);
 	}
 
 	/* Offload rx processing to workqueue */
 	queue_work(priv->rx_workqueue, &priv->rx_work);
 
 
- 	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+ 	dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 }
 
 /**
@@ -1995,20 +1995,20 @@ static void ca8210_rx_done(struct work_struct *work)
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
 	if (len > SPI_BUF_SIZE)
-		pr_crit("[ca8210] Received packet len (%d) erroneously long\n", len);
+		dev_crit(&priv->spi->dev, "Received packet len (%d) erroneously long\n", len);
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, '\xff', SPI_BUF_SIZE);
 
-	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 		return;
@@ -2017,7 +2017,7 @@ static void ca8210_rx_done(struct work_struct *work)
 		if (priv->sync_command_response == NULL) {
 			priv->sync_command_pending = false;
 			mutex_unlock(&priv->sync_command_mutex);
-			pr_crit("[ca8210] Sync command provided no response buffer\n");
+			dev_crit(&priv->spi->dev, "Sync command provided no response buffer\n");
 			return;
 		}
 		memcpy(priv->sync_command_response, buf, len);
@@ -2029,13 +2029,13 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	ca8210_net_rx(priv->hw, buf, len);
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
-	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 }
 
 /******************************************************************************/
@@ -2060,25 +2060,25 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
-	pr_debug("[ca8210] ca8210_net_rx(), CmdID = %d\n", command[0]);
+	dev_dbg(&priv->spi->dev, "ca8210_net_rx(), CmdID = %d\n", command[0]);
 
 
 	if (command[0] == SPI_MCPS_DATA_INDICATION) {
 		/* Received data */
-		pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+		dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock_irqsave(&priv->lock, flags);
-		pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+		dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (command[26] == priv->lastDSN) {
-			pr_debug("[ca8210] DSN %d resend received, ignoring...\n", command[26]);
-			pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(&priv->spi->dev, "DSN %d resend received, ignoring...\n", command[26]);
+			dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 			spin_unlock_irqrestore(&priv->lock, flags);
-			pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+			dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 			return 0;
 		}
 		priv->lastDSN = command[26];
-		pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+		dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 		spin_unlock_irqrestore(&priv->lock, flags);
-		pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+		dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 		return ca8210_skb_rx(hw, len-2, command+2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
 		if (priv->async_tx_pending) {
@@ -2110,35 +2110,36 @@ static int ca8210_skb_rx(struct ieee802154_hw *hw, size_t len, uint8_t *data_ind
 	int msdulen;
 	int hlen;
 	struct sk_buff *skb;
+	struct ca8210_priv *priv = hw->priv;
 
 	/* Allocate mtu size buffer for every rx packet */
 	skb = dev_alloc_skb(IEEE802154_MTU + sizeof(hdr));
 	if (skb == NULL) {
-		pr_crit("[ca8210] dev_alloc_skb failed\n");
+		dev_crit(&priv->spi->dev, "dev_alloc_skb failed\n");
 		return -ENOMEM;
 	}
 	skb_reserve(skb, sizeof(hdr));
 
 	msdulen = data_ind[22]; /* MsduLength */
-	pr_debug("[ca8210] skb buffer length = %d\n", msdulen);
+	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
 
 	/* Populate hdr */
 	hdr.sec.level = data_ind[29 + msdulen];
-	pr_debug("[ca8210] security level: %#03x\n", hdr.sec.level);
+	dev_dbg(&priv->spi->dev, "security level: %#03x\n", hdr.sec.level);
 	if (hdr.sec.level > 0) {
 		hdr.sec.key_id_mode = data_ind[30 + msdulen];
 		memcpy(&hdr.sec.extended_src, &data_ind[31 + msdulen], 8);
 		hdr.sec.key_id = data_ind[39 + msdulen];
 	}
 	hdr.source.mode = data_ind[0];
-	pr_debug("[ca8210] srcAddrMode: %#03x\n", hdr.source.mode);
+	dev_dbg(&priv->spi->dev, "srcAddrMode: %#03x\n", hdr.source.mode);
 	hdr.source.pan_id = *(uint16_t*)&data_ind[1];
-	pr_debug("[ca8210] srcPanId: %#06x\n", hdr.source.pan_id);
+	dev_dbg(&priv->spi->dev, "srcPanId: %#06x\n", hdr.source.pan_id);
 	memcpy(&hdr.source.extended_addr, &data_ind[3], 8);
 	hdr.dest.mode = data_ind[11];
-	pr_debug("[ca8210] dstAddrMode: %#03x\n", hdr.dest.mode);
+	dev_dbg(&priv->spi->dev, "dstAddrMode: %#03x\n", hdr.dest.mode);
 	hdr.dest.pan_id = *(uint16_t*)&data_ind[12];
-	pr_debug("[ca8210] dstPanId: %#06x\n", hdr.dest.pan_id);
+	dev_dbg(&priv->spi->dev, "dstPanId: %#06x\n", hdr.dest.pan_id);
 	memcpy(&hdr.dest.extended_addr, &data_ind[14], 8);
 
 	/* Fill in FC implicitly */
@@ -2187,7 +2188,7 @@ static int ca8210_skb_tx(struct sk_buff *skb, uint8_t msduhandle, struct ca8210_
 	struct ieee802154_hdr header = { 0 };
 	struct SecSpec secspec;
 
-	pr_debug("[ca8210] ca8210_skb_tx() called\n");
+	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
 
 	/* Get addressing info from skb - ieee802154 layer creates a full packet*/
 	ieee802154_hdr_peek_addrs(skb, &header);
@@ -2235,15 +2236,15 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 	                   &priv->async_tx_timeout_work,
 	                   msecs_to_jiffies(DATA_CNF_TIMEOUT_MS));
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = true;
 
-	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 }
 
 /**
@@ -2258,17 +2259,17 @@ static void ca8210_async_tx_timeout_worker(struct work_struct *work)
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
-	pr_err("[ca8210] data confirm timed out\n");
+	dev_err(&priv->spi->dev, "data confirm timed out\n");
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = false;
 
-	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	ieee802154_wake_queue(priv->hw);
 }
@@ -2287,7 +2288,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 
 	priv->async_tx_workqueue = alloc_ordered_workqueue("ca8210 tx worker", 0);
 	if (priv->async_tx_workqueue == NULL) {
-		pr_crit("[ca8210] alloc_ordered_workqueue failed\n");
+		dev_crit(&priv->spi->dev, "alloc_ordered_workqueue failed\n");
 		return -ENOMEM;
 	}
 	INIT_WORK(&priv->async_tx_work, ca8210_async_tx_worker);
@@ -2298,7 +2299,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 	RxOnWhenIdle = 1;
 	status = MLME_SET_request_sync(macRxOnWhenIdle, 0, 1, &RxOnWhenIdle, priv->spi);
 	if (status) {
-		pr_crit("[ca8210] Setting RxOnWhenIdle failed, Status = %d\n", status);
+		dev_crit(&priv->spi->dev, "Setting RxOnWhenIdle failed, Status = %d\n", status);
 		return link_to_linux_err(status);
 	}
 
@@ -2335,7 +2336,7 @@ static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
 	struct ca8210_priv *priv = hw->priv;
 	int status;
 
-	pr_debug("[ca8210] calling ca8210_xmit_sync()\n");
+	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_sync()\n");
 
 	status = ca8210_skb_tx(skb, priv->nextmsduhandle++, priv);
 	if (status)
@@ -2365,7 +2366,7 @@ static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct ca8210_priv *priv = hw->priv;
 
-	pr_debug("[ca8210] calling ca8210_xmit_async()\n");
+	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_async()\n");
 
 	priv->tx_skb = skb;
 	queue_work(priv->async_tx_workqueue, &priv->async_tx_work);
@@ -2389,14 +2390,14 @@ static int ca8210_async_xmit_complete(struct ieee802154_hw *hw, uint8_t msduhand
 	unsigned cpu = smp_processor_id();
 
 	if (status) {
-		pr_err("[ca8210] Link transmission unsuccessful, Status = %d\n", status);
+		dev_err(&priv->spi->dev, "Link transmission unsuccessful, Status = %d\n", status);
 		if (status == 0xF1) {
 			MLME_RESET_request_sync(0, priv->spi);
 		}
 	}
 
 	if (priv->nextmsduhandle != msduhandle) {
-		pr_crit("[ca8210] Unexpected MsduHandle on data confirm, Expected %d, got %d\n",
+		dev_crit(&priv->spi->dev, "Unexpected MsduHandle on data confirm, Expected %d, got %d\n",
 			priv->nextmsduhandle,
 			msduhandle);
 		priv->nextmsduhandle = 0;
@@ -2405,18 +2406,18 @@ static int ca8210_async_xmit_complete(struct ieee802154_hw *hw, uint8_t msduhand
 
 	/* stop timeout work */
 	if (!cancel_delayed_work_sync(&priv->async_tx_timeout_work)) {
-		pr_err("[ca8210] async tx timeout wasn't pending when transfer complete\n");
+		dev_err(&priv->spi->dev, "async tx timeout wasn't pending when transfer complete\n");
 	}
 
-	pr_debug("[ca8210] Trying to get spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	pr_debug("[ca8210] Got spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = false;
 
-	pr_debug("[ca8210] Releasing spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	pr_debug("[ca8210] Released spinlock on CPU%d\n", cpu);
+	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	priv->nextmsduhandle++;
 	ieee802154_xmit_complete(priv->hw, priv->tx_skb, true);
@@ -2456,7 +2457,7 @@ static int ca8210_set_channel(struct ieee802154_hw *hw, uint8_t page, uint8_t ch
 	struct ca8210_priv *priv = hw->priv;
 	status = MLME_SET_request_sync(phyCurrentChannel, 0, 1, &channel, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting channel, MLME-SET.confirm status = %d\n", status);
+		dev_err(&priv->spi->dev, "problem setting channel, MLME-SET.confirm status = %d\n", status);
 	}
 	return link_to_linux_err(status);
 }
@@ -2484,21 +2485,21 @@ static int ca8210_set_hw_addr_filt(struct ieee802154_hw *hw,
 	if (changed&IEEE802154_AFILT_PANID_CHANGED) {
 		status = MLME_SET_request_sync(macPANId, 0, 2, &filt->pan_id, priv->spi);
 		if (status) {
-			pr_err("[ca8210] problem setting pan id, MLME-SET.confirm status = %d", status);
+			dev_err(&priv->spi->dev, "problem setting pan id, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_SADDR_CHANGED) {
 		status = MLME_SET_request_sync(macShortAddress, 0, 2, &filt->short_addr, priv->spi);
 		if (status) {
-			pr_err("[ca8210] problem setting short address, MLME-SET.confirm status = %d", status);
+			dev_err(&priv->spi->dev, "problem setting short address, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_IEEEADDR_CHANGED) {
 		status = MLME_SET_request_sync(nsIEEEAddress, 0, 8, &filt->ieee_addr, priv->spi);
 		if (status) {
-			pr_err("[ca8210] problem setting ieee address, MLME-SET.confirm status = %d", status);
+			dev_err(&priv->spi->dev, "problem setting ieee address, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
 		}
 	}
@@ -2561,7 +2562,7 @@ static int ca8210_set_cca_mode(struct ieee802154_hw *hw, const struct wpan_phy_c
 	}
 	status = MLME_SET_request_sync(phyCCAMode, 0, 1, &CCAMode, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting cca mode, MLME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting cca mode, MLME-SET.confirm status = %d", status);
 	}
 	return link_to_linux_err(status);
 }
@@ -2583,7 +2584,7 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, int32_t level)
 	struct ca8210_priv *priv = hw->priv;
 	status = HWME_SET_request_sync(HWME_EDTHRESHOLD, 1, &EDTHRESHOLD, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting ed threshold, HWME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting ed threshold, HWME-SET.confirm status = %d", status);
 	}
 	return link_to_linux_err(status);
 }
@@ -2603,17 +2604,17 @@ static int ca8210_set_csma_params(struct ieee802154_hw *hw, uint8_t min_be, uint
 	struct ca8210_priv *priv = hw->priv;
 	status = MLME_SET_request_sync(macMinBE, 0, 1, &min_be, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting min be, MLME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting min be, MLME-SET.confirm status = %d", status);
 		return link_to_linux_err(status);
 	}
 	status = MLME_SET_request_sync(macMaxBE, 0, 1, &max_be, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting max be, MLME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting max be, MLME-SET.confirm status = %d", status);
 		return link_to_linux_err(status);
 	}
 	status = MLME_SET_request_sync(macMaxCSMABackoffs, 0, 1, &retries, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting max csma backoffs, MLME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting max csma backoffs, MLME-SET.confirm status = %d", status);
 	}
 	return link_to_linux_err(status);
 }
@@ -2634,7 +2635,7 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	struct ca8210_priv *priv = hw->priv;
 	status = MLME_SET_request_sync(macMaxFrameRetries, 0, 1, &retries, priv->spi);
 	if (status) {
-		pr_err("[ca8210] problem setting panid, MLME-SET.confirm status = %d", status);
+		dev_err(&priv->spi->dev, "problem setting panid, MLME-SET.confirm status = %d", status);
 	}
 	return link_to_linux_err(status);
 }
@@ -2743,7 +2744,7 @@ static ssize_t ca8210_test_int_user_read(struct file *filp, char __user *buf, si
 		return 0;
 
 	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, 4) != 4) {
-		pr_err("[ca8210] test_interface: Wrong number of elements popped from upstream fifo\n");
+		dev_err(&priv->spi->dev, "test_interface: Wrong number of elements popped from upstream fifo\n");
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
@@ -2751,11 +2752,11 @@ static ssize_t ca8210_test_int_user_read(struct file *filp, char __user *buf, si
 
 	kfree(fifo_buffer);
 
-	pr_debug("[ca8210] test_interface: Cmd len = %d\n", cmdlen);
+	dev_dbg(&priv->spi->dev, "test_interface: Cmd len = %d\n", cmdlen);
 
-	pr_debug("[ca8210] test_interface: Read\n");
+	dev_dbg(&priv->spi->dev, "test_interface: Read\n");
 	for (i = 0; i < cmdlen+2; i++) {
-		pr_debug("%#03x\n", buf[i]);
+		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
 	}
 
 	return cmdlen+2;
@@ -2777,9 +2778,9 @@ static int ca8210_test_int_driver_write(const uint8_t *buf, size_t len, void *sp
 	char *fifo_buffer;
 	int i;
 
-	pr_debug("[ca8210] test_interface: Buffering upstream message:\n");
+	dev_dbg(&priv->spi->dev, "test_interface: Buffering upstream message:\n");
 	for (i = 0; i < len; i++) {
-		pr_debug("%#03x\n", buf[i]);
+		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
 	}
 
 	fifo_buffer = kmalloc(len, GFP_KERNEL);
@@ -3030,6 +3031,7 @@ static uint8_t TDME_SETSFR_request_sync(
 {
 	int ret;
 	struct MAC_Message Command, Response;
+	struct spi_device *spi = pDeviceRef;
 	Command.CommandId = SPI_TDME_SETSFR_REQUEST;
 	Command.Length = 3;
 	Command.PData.TDMESetSFRReq.SFRPage    = SFRPage;
@@ -3038,12 +3040,12 @@ static uint8_t TDME_SETSFR_request_sync(
 	Response.CommandId = 0xFF;
 	ret = cascoda_api_downstream(&Command.CommandId, Command.Length + 2, &Response.CommandId, pDeviceRef);
 	if (ret) {
-		pr_crit("cascoda_api_downstream returned %d", ret);
+		dev_crit(&spi->dev, "cascoda_api_downstream returned %d", ret);
 		return MAC_SYSTEM_ERROR;
 	}
 
 	if (Response.CommandId != SPI_TDME_SETSFR_CONFIRM) {
-		pr_crit("sync response to SPI_TDME_SETSFR_REQUEST was not SPI_TDME_SETSFR_CONFIRM, it was %d\n", Response.CommandId);
+		dev_crit(&spi->dev, "sync response to SPI_TDME_SETSFR_REQUEST was not SPI_TDME_SETSFR_CONFIRM, it was %d\n", Response.CommandId);
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -3289,18 +3291,18 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *pDeviceRef)
 
 static int __init ca8210_init(void)
 {
-	pr_info("[ca8210] Starting module ca8210\n");
+	pr_info("Starting module ca8210\n");
 	spi_register_driver(&ca8210_spi_driver);
-	pr_info("[ca8210] Module started\n");
+	pr_info("ca8210 module started\n");
 	return 0;
 }
 module_init(ca8210_init);
 
 static void __exit ca8210_exit(void)
 {
-	pr_info("[ca8210] Stopping module ca8210\n");
+	pr_info("Stopping module ca8210\n");
 	spi_unregister_driver(&ca8210_spi_driver);
-	pr_info("[ca8210] Module stopped\n");
+	pr_info("ca8210 module stopped\n");
 }
 module_exit(ca8210_exit);
 
