@@ -26,18 +26,4 @@ sudo modprobe ca8210sm
 ```
 
 ---
-Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210 similar to the following:
-
-```
-ca8210@0 {  /* chip select number */  
-	compatible = "cascoda,ca8210";  
-	reg = <0>;  
-	spi-max-frequency = <3000000>;                  /* max of 4000000 */  
-	spi-cpol;                                       /* clock polarity 1, clock phase 0 */  
-	reset-gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;       /* GPIOs dependent on specific hardware */  
-	irq-gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-	extclock-enable;                                /* if external clock provided by ca8210 is desired*/  
-	extclock-freq = 16000000;                       /* frequency as specified in ca8210 datasheet */  
-	extclock-gpio = 2;                              /* output gpio as specified in ca8210 datasheet */  
-};
-```
+Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210. See Docs/devicetree/ca8210.txt for more info.
