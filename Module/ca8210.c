@@ -2201,27 +2201,6 @@ static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
 }
 
 /**
- * ca8210_set_lbt() - Sets the listen before transmit capability of the ca8210
- * @hw:  ieee802154_hw of target ca8210
- * @on:  Whether lbt should be turned on or not
- *
- * Return: 0 or linux error code
- */
-static int ca8210_set_lbt(struct ieee802154_hw *hw, bool on)
-{
-	uint8_t Backoffs;
-	struct ca8210_priv *priv = hw->priv;
-	if (on) {
-		Backoffs = 4; /* Default TODO: Does this make sense? */
-	} else {
-		Backoffs = 0; /* Effectively off */
-	}
-	return link_to_linux_err(
-		MLME_SET_request_sync(MAC_MAX_CSMA_BACKOFFS, 0, 1, &Backoffs, priv->spi)
-	);
-}
-
-/**
  * ca8210_set_cca_mode() - Sets the clear channel assessment mode of the ca8210
  * @hw:   ieee802154_hw of target ca8210
  * @cca:  CCA mode to set
@@ -2327,7 +2306,6 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_channel = ca8210_set_channel,
 	.set_hw_addr_filt = ca8210_set_hw_addr_filt,
 	.set_txpower = ca8210_set_tx_power,
-	.set_lbt = ca8210_set_lbt,
 	.set_cca_mode = ca8210_set_cca_mode,
 	.set_cca_ed_level = ca8210_set_cca_ed_level,
 	.set_csma_params = ca8210_set_csma_params,
@@ -2815,10 +2793,9 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	ca8210_hw->phy->symbol_duration = 16;
 	ca8210_hw->phy->lifs_period = 40;
 	ca8210_hw->phy->sifs_period = 12;
-	ca8210_hw->flags = /*IEEE802154_HW_LBT |*/ /*TODO: Remove this?*/
-	                   IEEE802154_HW_AFILT |
+	ca8210_hw->flags = IEEE802154_HW_AFILT |
 	                   IEEE802154_HW_OMIT_CKSUM |
-			   IEEE802154_HW_FRAME_RETRIES |
+	                   IEEE802154_HW_FRAME_RETRIES |
 	                   IEEE802154_HW_CSMA_PARAMS;
 	ca8210_hw->phy->flags = WPAN_PHY_FLAG_TXPOWER |
 				WPAN_PHY_FLAG_CCA_ED_LEVEL |
