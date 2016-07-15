@@ -76,7 +76,6 @@
 /******************************************************************************/
 
 #define DRIVER_NAME "ca8210"
-#define FUNCTION_VERSION "Linux Complete Kernel Module"
 
 /* external clock frequencies */
 #define ONE_MHZ      1000000
@@ -86,15 +85,15 @@
 #define SIXTEEN_MHZ  16*ONE_MHZ
 
 /* spi constants */
-#define SPI_BUF_SIZE 256
-#define SPI_T_TIMEOUT 500     /* Timeout for NACKs [ms] */
+#define CA8210_SPI_BUF_SIZE 256
+#define CA8210_SYNC_TIMEOUT 1000     /* Timeout for synchronous commands [ms] */
 
 /* api constants */
-#define DATA_CNF_TIMEOUT_MS 300
+#define CA8210_DATA_CNF_TIMEOUT 300   /* Timeout for data confirms [ms] */
 
 /* test interface constants */
-#define TEST_INT_FILE_NAME "ca8210_test"
-#define TEST_INT_FIFO_SIZE 256
+#define CA8210_TEST_INT_FILE_NAME "ca8210_test"
+#define CA8210_TEST_INT_FIFO_SIZE 256
 
 /* MAC status enumerations */
 #define MAC_SUCCESS                     (0x00)
@@ -139,148 +138,73 @@
 #define MAC_SYSTEM_ERROR                (0xFF)
 
 /* HWME attribute IDs */
-#define HWME_POWERCON          (0x00)
-#define HWME_CHIPID            (0x01)
-#define HWME_TXPOWER           (0x02)
-#define HWME_CCAMODE           (0x03)
 #define HWME_EDTHRESHOLD       (0x04)
-#define HWME_CSTHRESHOLD       (0x05)
 #define HWME_EDVALUE           (0x06)
-#define HWME_CSVALUE           (0x07)
-#define HWME_EDVALLP           (0x08)
-#define HWME_CSVALLP           (0x09)
-#define HWME_FREQOFFS          (0x0A)
-#define HWME_MACTIMER          (0x0B)
-#define HWME_RANDOMNUM         (0x0C)
-#define HWME_TEMPERATURE       (0x0D)
-#define HWME_HSKEY             (0x0E)
 #define HWME_SYSCLKOUT         (0x0F)
-#define HWME_LQIMODE           (0x10)
-#define HWME_MIN_ATTRIBUTE     HWME_POWERCON
-#define HWME_MAX_ATTRIBUTE     HWME_LQIMODE
 
 /* TDME attribute IDs */
 #define TDME_CHANNEL          (0x00)
-#define TDME_TX_CONFIG        (0x01)
-#define TDME_ED_CONFIG        (0x02)
-#define TDME_RX_CONFIG        (0x03)
-#define TDME_LO_1_CONFIG      (0x04)
-#define TDME_LO_2_CONFIG      (0x05)
 #define TDME_ATM_CONFIG       (0x06)
-#define TDME_MIN_ATTRIBUTE    TDME_CHANNEL
-#define TDME_MAX_ATTRIBUTE    TDME_ATM_CONFIG
 
 #define MAX_HWME_ATTRIBUTE_SIZE  16
 #define MAX_TDME_ATTRIBUTE_SIZE  2
 
 /* PHY/MAC PIB Attribute Enumerations */
-#define phyCurrentChannel               (0x00)
-#define phyChannelsSupport              (0x01)
-#define phyTransmitPower                (0x02)
-#define phyCCAMode                      (0x03)
-#define phyCurrentPage                  (0x04)
-#define phyMaxFrameDuration             (0x05)
-#define phySHRDuration                  (0x06)
-#define phySymbolsPerOctet              (0x07)
+#define PHY_CURRENT_CHANNEL               (0x00)
+#define PHY_TRANSMIT_POWER                (0x02)
+#define PHY_CCA_MODE                      (0x03)
+#define MAC_ASSOCIATION_PERMIT            (0x41)
+#define MAC_AUTO_REQUEST                  (0x42)
+#define MAC_BATT_LIFE_EXT                 (0x43)
+#define MAC_BATT_LIFE_EXT_PERIODS         (0x44)
+#define MAC_BEACON_PAYLOAD                (0x45)
+#define MAC_BEACON_PAYLOAD_LENGTH         (0x46)
+#define MAC_BEACON_ORDER                  (0x47)
+#define MAC_GTS_PERMIT                    (0x4d)
+#define MAC_MAX_CSMA_BACKOFFS             (0x4e)
+#define MAC_MIN_BE                        (0x4f)
+#define MAC_PAN_ID                        (0x50)
+#define MAC_PROMISCUOUS_MODE              (0x51)
+#define MAC_RX_ON_WHEN_IDLE               (0x52)
+#define MAC_SHORT_ADDRESS                 (0x53)
+#define MAC_SUPERFRAME_ORDER              (0x54)
+#define MAC_ASSOCIATED_PAN_COORD          (0x56)
+#define MAC_MAX_BE                        (0x57)
+#define MAC_MAX_FRAME_RETRIES             (0x59)
+#define MAC_RESPONSE_WAIT_TIME            (0x5A)
+#define MAC_SECURITY_ENABLED              (0x5D)
 
-#define phyPibFirst                     (phyCurrentChannel)
-#define phyPibLast                      (phySymbolsPerOctet)
+#define MAC_AUTO_REQUEST_SECURITY_LEVEL   (0x78)
+#define MAC_AUTO_REQUEST_KEY_ID_MODE      (0x79)
 
-#define macAckWaitDuration              (0x40)
-#define macAssociationPermit            (0x41)
-#define macAutoRequest                  (0x42)
-#define macBattLifeExt                  (0x43)
-#define macBattLifeExtPeriods           (0x44)
-#define macBeaconPayload                (0x45)
-#define macBeaconPayloadLength          (0x46)
-#define macBeaconOrder                  (0x47)
-#define macBeaconTxTime                 (0x48)
-#define macBSN                          (0x49)
-#define macCoordExtendedAddress         (0x4a)
-#define macCoordShortAddress            (0x4b)
-#define macDSN                          (0x4c)
-#define macGTSPermit                    (0x4d)
-#define macMaxCSMABackoffs              (0x4e)
-#define macMinBE                        (0x4f)
-#define macPANId                        (0x50)
-#define macPromiscuousMode              (0x51)
-#define macRxOnWhenIdle                 (0x52)
-#define macShortAddress                 (0x53)
-#define macSuperframeOrder              (0x54)
-#define macTransactionPersistenceTime	(0x55)
-#define macAssociatedPANCoord           (0x56)
-#define macMaxBE                        (0x57)
-#define macMaxFrameTotalWaitTime        (0x58)
-#define macMaxFrameRetries              (0x59)
-#define macResponseWaitTime             (0x5A)
-#define macSyncSymbolOffset             (0x5B)
-#define macTimestampSupported           (0x5C)
-#define macSecurityEnabled              (0x5D)
-
-#define macPibFirst                     (macAckWaitDuration)
-#define macPibLast                      (macSecurityEnabled)
-
-#define macKeyTable                     (0x71)
-#define macKeyTableEntries              (0x72)
-#define macDeviceTable                  (0x73)
-#define macDeviceTableEntries           (0x74)
-#define macSecurityLevelTable           (0x75)
-#define macSecurityLevelTableEntries    (0x76)
-#define macFrameCounter                 (0x77)
-#define macAutoRequestSecurityLevel     (0x78)
-#define macAutoRequestKeyIdMode         (0x79)
-#define macAutoRequestKeySource         (0x7A)
-#define macAutoRequestKeyIndex          (0x7B)
-#define macDefaultKeySource             (0x7C)
-#define macPANCoordExtendedAddress      (0x7D)
-#define macPANCoordShortAddress         (0x7E)
-
-#define macSecPibFirst                  (macKeyTable)
-#define macSecPibLast                   (macPANCoordShortAddress)
-
-#define nsIEEEAddress                   (0xFF)    /* Non-standard IEEE address */
+#define NS_IEEE_ADDRESS                   (0xFF)    /* Non-standard IEEE address */
 
 /* MAC Address Mode Definitions */
 #define MAC_MODE_NO_ADDR                ((unsigned)0x00)
-#define MAC_MODE_RESERVED               ((unsigned)0x01)
 #define MAC_MODE_SHORT_ADDR             ((unsigned)0x02)
 #define MAC_MODE_LONG_ADDR              ((unsigned)0x03)
 
 /* MAC constants */
-#define aMaxPHYPacketSize               (127)
-#define aMaxBeaconOverhead              (75)
-#define aMaxBeaconPayloadLength         (aMaxPHYPacketSize-aMaxBeaconOverhead)
+#define MAX_PHY_PACKET_SIZE               (127)
+#define MAX_BEACON_OVERHEAD               (75)
+#define MAX_BEACON_PAYLOAD_LENGTH         (MAX_PHY_PACKET_SIZE-MAX_BEACON_OVERHEAD)
 
 #define MAX_ATTRIBUTE_SIZE              (250)
 #define MAX_DATA_SIZE                   (114)
 
-#define M_MinimumChannel                (11)
-#define M_MaximumChannel                (26)
-#define M_ValidChannels                 (0x07FFF800)
-
-/* Data Request includes 1 phylen, 2 fc, 1 dsn, 12 address, 1 payload, 2 fcs */
-#define BASELEN_DATA_REQUEST            (19)
+#define CA8210_VALID_CHANNELS                 (0x07FFF800)
 
 /* MAC workarounds for V1.1 and MPW silicon (V0.x) */
-#define MAC_Workarounds (0)
-#define MAC_MPW         (0)
+#define CA8210_MAC_WORKAROUNDS (0)
+#define CA8210_MAC_MPW         (0)
 
 /* memory manipulation macros */
 #define LS_BYTE(x)     ((uint8_t)((x)&0xFF))
 #define MS_BYTE(x)     ((uint8_t)(((x)>>8)&0xFF))
-#define LS0_BYTE(x)    ((uint8_t)((x)&0xFF))
-#define LS1_BYTE(x)    ((uint8_t)(((x)>>8)&0xFF))
-#define LS2_BYTE(x)    ((uint8_t)(((x)>>16)&0xFF))
-#define LS3_BYTE(x)    ((uint8_t)(((x)>>24)&0xFF))
-#define GETLE16(x)     (((uint16_t)(x)[1]<<8)+(x)[0])
-#define GETLE32(x)     (((uint32_t)(x)[3]<<24)+((uint32_t)(x)[2]<<16)+((uint32_t)(x)[1]<<8)+(x)[0])
-#define PUTLE16(x,y)   {(y)[0]=((x)&0xff);(y)[1]=((x)>>8);}
-#define PUTLE32(x,y)   {(y)[0]=((x)&0xff);(y)[1]=(((x)>>8)&0xff);(y)[2]=(((x)>>16)&0xff);(y)[3]=(((x)>>24)&0xff);}
 
 /* message ID codes in SPI commands */
 /* downstream */
 #define MCPS_DATA_REQUEST                     (0x00)
-#define MCPS_PURGE_REQUEST                    (0x01)
 #define MLME_ASSOCIATE_REQUEST                (0x02)
 #define MLME_ASSOCIATE_RESPONSE               (0x03)
 #define MLME_DISASSOCIATE_REQUEST             (0x04)
@@ -291,55 +215,24 @@
 #define MLME_SCAN_REQUEST                     (0x09)
 #define MLME_SET_REQUEST                      (0x0A)
 #define MLME_START_REQUEST                    (0x0B)
-#define MLME_SYNC_REQUEST                     (0x0C)
 #define MLME_POLL_REQUEST                     (0x0D)
 #define HWME_SET_REQUEST                      (0x0E)
 #define HWME_GET_REQUEST                      (0x0F)
-#define HWME_HAES_REQUEST                     (0x10)
 #define TDME_SETSFR_REQUEST                   (0x11)
 #define TDME_GETSFR_REQUEST                   (0x12)
-#define TDME_TESTMODE_REQUEST                 (0x13)
 #define TDME_SET_REQUEST                      (0x14)
-#define TDME_TXPKT_REQUEST                    (0x15)
-#define TDME_LOTLK_REQUEST                    (0x16)
 /* upstream */
 #define MCPS_DATA_INDICATION                  (0x00)
 #define MCPS_DATA_CONFIRM                     (0x01)
-#define MCPS_PURGE_CONFIRM                    (0x02)
-#define MLME_ASSOCIATE_INDICATION             (0x03)
-#define MLME_ASSOCIATE_CONFIRM                (0x04)
-#define MLME_DISASSOCIATE_INDICATION          (0x05)
-#define MLME_DISASSOCIATE_CONFIRM             (0x06)
-#define MLME_BEACON_NOTIFY_INDICATION         (0x07)
-#define MLME_GET_CONFIRM                      (0x08)
-#define MLME_ORPHAN_INDICATION                (0x09)
 #define MLME_RESET_CONFIRM                    (0x0A)
-#define MLME_RX_ENABLE_CONFIRM                (0x0B)
-#define MLME_SCAN_CONFIRM                     (0x0C)
-#define MLME_COMM_STATUS_INDICATION           (0x0D)
 #define MLME_SET_CONFIRM                      (0x0E)
 #define MLME_START_CONFIRM                    (0x0F)
-#define MLME_SYNC_LOSS_INDICATION             (0x10)
-#define MLME_POLL_CONFIRM                     (0x11)
 #define HWME_SET_CONFIRM                      (0x12)
 #define HWME_GET_CONFIRM                      (0x13)
-#define HWME_HAES_CONFIRM                     (0x14)
-#define HWME_WAKEUP_INDICATION                (0x15)
-#define TDME_MESSAGE_INDICATION               (0x16)
 #define TDME_SETSFR_CONFIRM                   (0x17)
-#define TDME_GETSFR_CONFIRM                   (0x18)
-#define TDME_TESTMODE_CONFIRM                 (0x19)
-#define TDME_SET_CONFIRM                      (0x1A)
-#define TDME_TXPKT_CONFIRM                    (0x1B)
-#define TDME_RXPKT_INDICATION                 (0x1C)
-#define TDME_EDDET_INDICATION                 (0x1D)
-#define TDME_ERROR_INDICATION                 (0x1E)
-#define TDME_LOTLK_CONFIRM                    (0x1F)
 
 
 /* SPI command IDs */
-/* mask to derive the message ID code from the command ID */
-#define SPI_MID_MASK                       (0x1F)
 /* bit indicating a confirm or indication from slave to master */
 #define SPI_S2M                            (0x20)
 /* bit indicating a synchronous message */
@@ -350,63 +243,25 @@
 #define SPI_NACK                           (0xF0)
 
 #define SPI_MCPS_DATA_REQUEST              (MCPS_DATA_REQUEST)
-#define SPI_MCPS_PURGE_REQUEST             (MCPS_PURGE_REQUEST+SPI_SYN)
 #define SPI_MCPS_DATA_INDICATION           (MCPS_DATA_INDICATION+SPI_S2M)
 #define SPI_MCPS_DATA_CONFIRM              (MCPS_DATA_CONFIRM+SPI_S2M)
-#define SPI_MCPS_PURGE_CONFIRM             (MCPS_PURGE_CONFIRM+SPI_S2M+SPI_SYN)
 
 #define SPI_MLME_ASSOCIATE_REQUEST         (MLME_ASSOCIATE_REQUEST)
-#define SPI_MLME_ASSOCIATE_RESPONSE        (MLME_ASSOCIATE_RESPONSE)
-#define SPI_MLME_DISASSOCIATE_REQUEST      (MLME_DISASSOCIATE_REQUEST)
-#define SPI_MLME_GET_REQUEST               (MLME_GET_REQUEST+SPI_SYN)
-#define SPI_MLME_ORPHAN_RESPONSE           (MLME_ORPHAN_RESPONSE)
 #define SPI_MLME_RESET_REQUEST             (MLME_RESET_REQUEST+SPI_SYN)
-#define SPI_MLME_RX_ENABLE_REQUEST         (MLME_RX_ENABLE_REQUEST+SPI_SYN)
-#define SPI_MLME_SCAN_REQUEST              (MLME_SCAN_REQUEST)
 #define SPI_MLME_SET_REQUEST               (MLME_SET_REQUEST+SPI_SYN)
 #define SPI_MLME_START_REQUEST             (MLME_START_REQUEST+SPI_SYN)
-#define SPI_MLME_SYNC_REQUEST              (MLME_SYNC_REQUEST)
-#define SPI_MLME_POLL_REQUEST              (MLME_POLL_REQUEST+SPI_SYN)
-#define SPI_MLME_ASSOCIATE_INDICATION      (MLME_ASSOCIATE_INDICATION+SPI_S2M)
-#define SPI_MLME_ASSOCIATE_CONFIRM         (MLME_ASSOCIATE_CONFIRM+SPI_S2M)
-#define SPI_MLME_DISASSOCIATE_INDICATION   (MLME_DISASSOCIATE_INDICATION+SPI_S2M)
-#define SPI_MLME_DISASSOCIATE_CONFIRM      (MLME_DISASSOCIATE_CONFIRM+SPI_S2M)
-#define SPI_MLME_BEACON_NOTIFY_INDICATION  (MLME_BEACON_NOTIFY_INDICATION+SPI_S2M)
-#define SPI_MLME_GET_CONFIRM               (MLME_GET_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_MLME_ORPHAN_INDICATION         (MLME_ORPHAN_INDICATION+SPI_S2M)
 #define SPI_MLME_RESET_CONFIRM             (MLME_RESET_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_MLME_RX_ENABLE_CONFIRM         (MLME_RX_ENABLE_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_MLME_SCAN_CONFIRM              (MLME_SCAN_CONFIRM+SPI_S2M)
-#define SPI_MLME_COMM_STATUS_INDICATION    (MLME_COMM_STATUS_INDICATION+SPI_S2M)
 #define SPI_MLME_SET_CONFIRM               (MLME_SET_CONFIRM+SPI_S2M+SPI_SYN)
 #define SPI_MLME_START_CONFIRM             (MLME_START_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_MLME_SYNC_LOSS_INDICATION      (MLME_SYNC_LOSS_INDICATION+SPI_S2M)
-#define SPI_MLME_POLL_CONFIRM              (MLME_POLL_CONFIRM+SPI_S2M+SPI_SYN)
 
 #define SPI_HWME_SET_REQUEST               (HWME_SET_REQUEST+SPI_SYN)
 #define SPI_HWME_GET_REQUEST               (HWME_GET_REQUEST+SPI_SYN)
-#define SPI_HWME_HAES_REQUEST              (HWME_HAES_REQUEST+SPI_SYN)
 #define SPI_HWME_SET_CONFIRM               (HWME_SET_CONFIRM+SPI_S2M+SPI_SYN)
 #define SPI_HWME_GET_CONFIRM               (HWME_GET_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_HWME_HAES_CONFIRM              (HWME_HAES_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_HWME_WAKEUP_INDICATION         (HWME_WAKEUP_INDICATION+SPI_S2M)
 
 #define SPI_TDME_SETSFR_REQUEST            (TDME_SETSFR_REQUEST+SPI_SYN)
-#define SPI_TDME_GETSFR_REQUEST            (TDME_GETSFR_REQUEST+SPI_SYN)
-#define SPI_TDME_TESTMODE_REQUEST          (TDME_TESTMODE_REQUEST+SPI_SYN)
 #define SPI_TDME_SET_REQUEST               (TDME_SET_REQUEST+SPI_SYN)
-#define SPI_TDME_TXPKT_REQUEST             (TDME_TXPKT_REQUEST+SPI_SYN)
-#define SPI_TDME_LOTLK_REQUEST             (TDME_LOTLK_REQUEST+SPI_SYN)
-#define SPI_TDME_MESSAGE_INDICATION        (TDME_MESSAGE_INDICATION+SPI_S2M)
 #define SPI_TDME_SETSFR_CONFIRM            (TDME_SETSFR_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_TDME_GETSFR_CONFIRM            (TDME_GETSFR_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_TDME_TESTMODE_CONFIRM          (TDME_TESTMODE_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_TDME_SET_CONFIRM               (TDME_SET_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_TDME_TXPKT_CONFIRM             (TDME_TXPKT_CONFIRM+SPI_S2M+SPI_SYN)
-#define SPI_TDME_RXPKT_INDICATION          (TDME_RXPKT_INDICATION+SPI_S2M)
-#define SPI_TDME_EDDET_INDICATION          (TDME_EDDET_INDICATION+SPI_S2M)
-#define SPI_TDME_ERROR_INDICATION          (TDME_ERROR_INDICATION+SPI_S2M)
-#define SPI_TDME_LOTLK_CONFIRM             (TDME_LOTLK_CONFIRM+SPI_S2M+SPI_SYN)
 
 /******************************************************************************/
 /* Structs/Enums */
@@ -859,7 +714,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 static void ca8210_rx_done(struct work_struct *work)
 {
 	struct ca8210_priv *priv = container_of(work, struct ca8210_priv, rx_work);
-	uint8_t buf[SPI_BUF_SIZE];
+	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
@@ -869,11 +724,11 @@ static void ca8210_rx_done(struct work_struct *work)
 	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
-	if (len > SPI_BUF_SIZE)
+	if (len > CA8210_SPI_BUF_SIZE)
 		dev_crit(&priv->spi->dev, "Received packet len (%d) erroneously long\n", len);
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
-	memset(priv->cas_ctl.rx_final_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
 	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
@@ -971,14 +826,14 @@ static void ca8210_spi_continueRead(void *arg)
 	priv->cas_ctl.rx_msg.spi = spi;
 	priv->cas_ctl.rx_msg.is_dma_mapped = false;
 
-	if (priv->cas_ctl.rx_final_buf[1] == 0xFF) {
+	if (priv->cas_ctl.rx_final_buf[1] == SPI_IDLE) {
 		/* Start of data read */
 		priv->cas_ctl.data_received_so_far = 0;
 
 		dev_dbg(&spi->dev, "spi received cmdid: %d, len: %d\n",
 			priv->cas_ctl.rx_buf[0], priv->cas_ctl.rx_buf[1]);
-		if ( (priv->cas_ctl.rx_buf[0] == 0xFF /* IDLE */) ||
-		     (priv->cas_ctl.rx_buf[0] == 0xF0 /* NACK */) ) {
+		if ( (priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
+		     (priv->cas_ctl.rx_buf[0] == SPI_NACK) ) {
 			ca8210_spi_writeDummy(spi);
 			up(&priv->cas_ctl.spi_sem);
 			return;
@@ -1043,7 +898,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
 		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
-		if (priv->cas_ctl.rx_final_buf[0] == 0xFF) {
+		if (priv->cas_ctl.rx_final_buf[0] == SPI_IDLE) {
 			/* spi receive buffer cleared of last rx */
 			dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 			spin_unlock(&priv->lock);
@@ -1061,8 +916,8 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 	if (down_interruptible(&priv->cas_ctl.spi_sem))
 		return;
 
-	memset(priv->cas_ctl.rx_buf, '\xff', SPI_BUF_SIZE);
-	memset(priv->cas_ctl.rx_out_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_out_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
 	/* Read the first 2 bytes: CMD and LENGTH */
 	priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
@@ -1103,7 +958,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		return -ENODEV;
 	}
 
-	if (buf[0] == 0xFF && len == 1) {
+	if (buf[0] == SPI_IDLE && len == 1) {
 		dummy = true;
 	} else {
 		dummy = false;
@@ -1117,8 +972,8 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	dev_dbg(&spi->dev, "SPI write function -ca8210_spi_write- called\n");
 
 	/* Set in/out buffers to idle, copy over data to send */
-	memset(priv->cas_ctl.tx_buf, 0xFF, SPI_BUF_SIZE);
-	memset(priv->cas_ctl.tx_in_buf, 0xFF, SPI_BUF_SIZE);
+	memset(priv->cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
+	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 	memcpy(priv->cas_ctl.tx_buf, buf, len);
 
 	dev_dbg(&spi->dev, "device_comm: Command ID = %#03x Length = %#03x	Data:\n",
@@ -1177,8 +1032,8 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_in_buf[i]);
 	}
 
-	if (priv->cas_ctl.tx_in_buf[0] != 0xFF /* Not idle */ &&
-	    priv->cas_ctl.tx_in_buf[0] != 0xF0 /* Not NACK */) {
+	if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
+	    priv->cas_ctl.tx_in_buf[0] != SPI_NACK) {
 		/* Received start of rx packet during transfer */
 		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
@@ -1217,7 +1072,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		else {
 			dev_dbg(&spi->dev, "READ WHOLE CMD DURING TX\n");
 			/* whole packet read during transfer */
-			memcpy(priv->cas_ctl.rx_final_buf, priv->cas_ctl.tx_in_buf, SPI_BUF_SIZE);
+			memcpy(priv->cas_ctl.rx_final_buf, priv->cas_ctl.tx_in_buf, CA8210_SPI_BUF_SIZE);
 			INIT_WORK(&priv->rx_work, ca8210_rx_done);
 			queue_work(priv->rx_workqueue, &priv->rx_work);
 		}
@@ -1245,7 +1100,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 static int ca8210_spi_writeDummy(struct spi_device *spi)
 {
 	int ret;
-	uint8_t idle = 0xFF;
+	uint8_t idle = SPI_IDLE;
 
 	dev_dbg(&spi->dev, "spi: writing dummy packet\n");
 	ret =  ca8210_spi_write(spi, &idle, 1);
@@ -1305,7 +1160,7 @@ static int ca8210_spi_exchange(
 			}
 			mutex_unlock(&priv->sync_command_mutex);
 			currentjiffies = jiffies;
-			if ((currentjiffies - startjiffies) > msecs_to_jiffies(SPI_T_TIMEOUT)) {
+			if ((currentjiffies - startjiffies) > msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
 				dev_err(&spi->dev, "Synchronous confirm timeout\n");
 				return -ETIME;
 			}
@@ -1392,7 +1247,7 @@ static uint8_t TDME_SETSFR_request_sync(
 	Command.PData.TDMESetSFRReq.SFRPage    = SFRPage;
 	Command.PData.TDMESetSFRReq.SFRAddress = SFRAddress;
 	Command.PData.TDMESetSFRReq.SFRValue   = SFRValue;
-	Response.CommandId = 0xFF;
+	Response.CommandId = SPI_IDLE;
 	ret = cascoda_api_downstream(&Command.CommandId, Command.Length + 2, &Response.CommandId, pDeviceRef);
 	if (ret) {
 		dev_crit(&spi->dev, "cascoda_api_downstream returned %d", ret);
@@ -1500,73 +1355,73 @@ static uint8_t TDME_CheckPIBAttribute(
 
 	switch (PIBAttribute) {
 	/* PHY */
-	case phyTransmitPower:
+	case PHY_TRANSMIT_POWER:
 		if (value > 0x3F)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case phyCCAMode:
+	case PHY_CCA_MODE:
 		if (value > 0x03)
 			status = MAC_INVALID_PARAMETER;
 		break;
 	/* MAC */
-	case macBattLifeExtPeriods:
+	case MAC_BATT_LIFE_EXT_PERIODS:
 		if ((value < 6) || (value > 41))
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macBeaconPayload:
-		if (PIBAttributeLength > aMaxBeaconPayloadLength)
+	case MAC_BEACON_PAYLOAD:
+		if (PIBAttributeLength > MAX_BEACON_PAYLOAD_LENGTH)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macBeaconPayloadLength:
-		if (value > aMaxBeaconPayloadLength)
+	case MAC_BEACON_PAYLOAD_LENGTH:
+		if (value > MAX_BEACON_PAYLOAD_LENGTH)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macBeaconOrder:
+	case MAC_BEACON_ORDER:
 		if (value > 15)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macMaxBE:
+	case MAC_MAX_BE:
 		if ((value < 3) || (value > 8))
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macMaxCSMABackoffs:
+	case MAC_MAX_CSMA_BACKOFFS:
 		if (value > 5)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macMaxFrameRetries:
+	case MAC_MAX_FRAME_RETRIES:
 		if (value > 7)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macMinBE:
+	case MAC_MIN_BE:
 		if (value > 8)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macResponseWaitTime:
+	case MAC_RESPONSE_WAIT_TIME:
 		if ((value < 2) || (value > 64))
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macSuperframeOrder:
+	case MAC_SUPERFRAME_ORDER:
 		if (value > 15)
 			status = MAC_INVALID_PARAMETER;
 		break;
 	/* boolean */
-	case macAssociatedPANCoord:
-	case macAssociationPermit:
-	case macAutoRequest:
-	case macBattLifeExt:
-	case macGTSPermit:
-	case macPromiscuousMode:
-	case macRxOnWhenIdle:
-	case macSecurityEnabled:
+	case MAC_ASSOCIATED_PAN_COORD:
+	case MAC_ASSOCIATION_PERMIT:
+	case MAC_AUTO_REQUEST:
+	case MAC_BATT_LIFE_EXT:
+	case MAC_GTS_PERMIT:
+	case MAC_PROMISCUOUS_MODE:
+	case MAC_RX_ON_WHEN_IDLE:
+	case MAC_SECURITY_ENABLED:
 		if (value > 1)
 			status = MAC_INVALID_PARAMETER;
 		break;
 	/* MAC SEC */
-	case macAutoRequestSecurityLevel:
+	case MAC_AUTO_REQUEST_SECURITY_LEVEL:
 		if (value > 7)
 			status = MAC_INVALID_PARAMETER;
 		break;
-	case macAutoRequestKeyIdMode:
+	case MAC_AUTO_REQUEST_KEY_ID_MODE:
 		if (value > 3)
 			status = MAC_INVALID_PARAMETER;
 		break;
@@ -1601,7 +1456,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *pDeviceRef)
 		txp_ext += 0xC0;
 	txp_val = (int8_t)txp_ext;
 
-	if (MAC_MPW) {
+	if (CA8210_MAC_MPW) {
 		if (txp_val > 0) {
 			paib = 0xD3; /* 8 dBm: ptrim = 5, itrim = +3 => +4 dBm */
 		} else {
@@ -1732,7 +1587,7 @@ static uint8_t MLME_RESET_request_sync(uint8_t SetDefaultPIB, void *pDeviceRef)
 	status = SIMPLECNF.Status;
 
 	/* reset COORD Bit for Channel Filtering as Coordinator */
-	if (MAC_Workarounds && SetDefaultPIB && (!status))
+	if (CA8210_MAC_WORKAROUNDS && SetDefaultPIB && (!status))
 		status = TDME_SETSFR_request_sync(0, 0xD8, 0, pDeviceRef);
 
 	return status;
@@ -1766,14 +1621,14 @@ static uint8_t MLME_SET_request_sync(
 	if (TDME_CheckPIBAttribute(PIBAttribute, PIBAttributeLength, pPIBAttributeValue))
 		return MAC_INVALID_PARAMETER;
 
-	if (PIBAttribute == phyCurrentChannel) {
+	if (PIBAttribute == PHY_CURRENT_CHANNEL) {
 		status = TDME_ChannelInit(*((uint8_t*)pPIBAttributeValue), pDeviceRef);
 		if (status) {
 			return status;
 		}
 	}
 
-	if (PIBAttribute == phyTransmitPower)
+	if (PIBAttribute == PHY_TRANSMIT_POWER)
 		return(TDME_SetTxPower(*((uint8_t*)pPIBAttributeValue), pDeviceRef));
 
 	Command.CommandId = SPI_MLME_SET_REQUEST;
@@ -2108,7 +1963,7 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 
 	queue_delayed_work(priv->async_tx_workqueue,
 	                   &priv->async_tx_timeout_work,
-	                   msecs_to_jiffies(DATA_CNF_TIMEOUT_MS));
+	                   msecs_to_jiffies(CA8210_DATA_CNF_TIMEOUT));
 
 	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
@@ -2171,7 +2026,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 	priv->lastDSN = -1;
 	/* Turn receiver on when idle for now just to test rx */
 	RxOnWhenIdle = 1;
-	status = MLME_SET_request_sync(macRxOnWhenIdle, 0, 1, &RxOnWhenIdle, priv->spi);
+	status = MLME_SET_request_sync(MAC_RX_ON_WHEN_IDLE, 0, 1, &RxOnWhenIdle, priv->spi);
 	if (status) {
 		dev_crit(&priv->spi->dev, "Setting RxOnWhenIdle failed, Status = %d\n", status);
 		return link_to_linux_err(status);
@@ -2278,7 +2133,7 @@ static int ca8210_set_channel(struct ieee802154_hw *hw, uint8_t page, uint8_t ch
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
-	status = MLME_SET_request_sync(phyCurrentChannel, 0, 1, &channel, priv->spi);
+	status = MLME_SET_request_sync(PHY_CURRENT_CHANNEL, 0, 1, &channel, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting channel, MLME-SET.confirm status = %d\n", status);
 	}
@@ -2306,21 +2161,21 @@ static int ca8210_set_hw_addr_filt(struct ieee802154_hw *hw,
 	struct ca8210_priv *priv = hw->priv;
 
 	if (changed&IEEE802154_AFILT_PANID_CHANGED) {
-		status = MLME_SET_request_sync(macPANId, 0, 2, &filt->pan_id, priv->spi);
+		status = MLME_SET_request_sync(MAC_PAN_ID, 0, 2, &filt->pan_id, priv->spi);
 		if (status) {
 			dev_err(&priv->spi->dev, "problem setting pan id, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_SADDR_CHANGED) {
-		status = MLME_SET_request_sync(macShortAddress, 0, 2, &filt->short_addr, priv->spi);
+		status = MLME_SET_request_sync(MAC_SHORT_ADDRESS, 0, 2, &filt->short_addr, priv->spi);
 		if (status) {
 			dev_err(&priv->spi->dev, "problem setting short address, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_IEEEADDR_CHANGED) {
-		status = MLME_SET_request_sync(nsIEEEAddress, 0, 8, &filt->ieee_addr, priv->spi);
+		status = MLME_SET_request_sync(NS_IEEE_ADDRESS, 0, 8, &filt->ieee_addr, priv->spi);
 		if (status) {
 			dev_err(&priv->spi->dev, "problem setting ieee address, MLME-SET.confirm status = %d", status);
 			return link_to_linux_err(status);
@@ -2341,7 +2196,7 @@ static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
 {
 	struct ca8210_priv *priv = hw->priv;
 	return link_to_linux_err(
-		MLME_SET_request_sync(phyTransmitPower, 0, 1, &dbm, priv->spi)
+		MLME_SET_request_sync(PHY_TRANSMIT_POWER, 0, 1, &dbm, priv->spi)
 	);
 }
 
@@ -2362,7 +2217,7 @@ static int ca8210_set_lbt(struct ieee802154_hw *hw, bool on)
 		Backoffs = 0; /* Effectively off */
 	}
 	return link_to_linux_err(
-		MLME_SET_request_sync(macMaxCSMABackoffs, 0, 1, &Backoffs, priv->spi)
+		MLME_SET_request_sync(MAC_MAX_CSMA_BACKOFFS, 0, 1, &Backoffs, priv->spi)
 	);
 }
 
@@ -2383,7 +2238,7 @@ static int ca8210_set_cca_mode(struct ieee802154_hw *hw, const struct wpan_phy_c
 		/* CCAMode 0 == CS OR ED, 3 == CS AND ED */
 		CCAMode = 0;
 	}
-	status = MLME_SET_request_sync(phyCCAMode, 0, 1, &CCAMode, priv->spi);
+	status = MLME_SET_request_sync(PHY_CCA_MODE, 0, 1, &CCAMode, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting cca mode, MLME-SET.confirm status = %d", status);
 	}
@@ -2425,17 +2280,17 @@ static int ca8210_set_csma_params(struct ieee802154_hw *hw, uint8_t min_be, uint
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
-	status = MLME_SET_request_sync(macMinBE, 0, 1, &min_be, priv->spi);
+	status = MLME_SET_request_sync(MAC_MIN_BE, 0, 1, &min_be, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting min be, MLME-SET.confirm status = %d", status);
 		return link_to_linux_err(status);
 	}
-	status = MLME_SET_request_sync(macMaxBE, 0, 1, &max_be, priv->spi);
+	status = MLME_SET_request_sync(MAC_MAX_BE, 0, 1, &max_be, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting max be, MLME-SET.confirm status = %d", status);
 		return link_to_linux_err(status);
 	}
-	status = MLME_SET_request_sync(macMaxCSMABackoffs, 0, 1, &retries, priv->spi);
+	status = MLME_SET_request_sync(MAC_MAX_CSMA_BACKOFFS, 0, 1, &retries, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting max csma backoffs, MLME-SET.confirm status = %d", status);
 	}
@@ -2456,7 +2311,7 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
-	status = MLME_SET_request_sync(macMaxFrameRetries, 0, 1, &retries, priv->spi);
+	status = MLME_SET_request_sync(MAC_MAX_FRAME_RETRIES, 0, 1, &retries, priv->spi);
 	if (status) {
 		dev_err(&priv->spi->dev, "problem setting panid, MLME-SET.confirm status = %d", status);
 	}
@@ -2508,7 +2363,7 @@ static int ca8210_test_int_open(struct inode *inodp, struct file *filp)
 static int ca8210_test_check_upstream(uint8_t *buf, void *pDeviceRef)
 {
 	int ret;
-	uint8_t response[SPI_BUF_SIZE];
+	uint8_t response[CA8210_SPI_BUF_SIZE];
 	if (buf[0] == SPI_MLME_SET_REQUEST) {
 		ret = TDME_CheckPIBAttribute(buf[2], buf[4], buf + 5);
 		if (ret) {
@@ -2525,11 +2380,11 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *pDeviceRef)
 		return TDME_ChannelInit(buf[2], pDeviceRef);
 	} else if ( buf[0] == SPI_MLME_START_REQUEST) {
 		return TDME_ChannelInit(buf[4], pDeviceRef);
-	} else if ((buf[0] == SPI_MLME_SET_REQUEST) && (buf[2] == phyCurrentChannel)) {
+	} else if ((buf[0] == SPI_MLME_SET_REQUEST) && (buf[2] == PHY_CURRENT_CHANNEL)) {
 		return TDME_ChannelInit(buf[5], pDeviceRef);
 	} else if ((buf[0] == SPI_TDME_SET_REQUEST) && (buf[2] == TDME_CHANNEL)) {
 		return TDME_ChannelInit(buf[4], pDeviceRef);
-	} else if ((MAC_Workarounds) && (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
+	} else if ((CA8210_MAC_WORKAROUNDS) && (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
 		/* reset COORD Bit for Channel Filtering as Coordinator */
 		return TDME_SETSFR_request_sync(0, 0xD8, 0, pDeviceRef);
 	}
@@ -2550,7 +2405,7 @@ static ssize_t ca8210_test_int_user_write(struct file *filp, const char *in_buf,
 {
 	int ret;
 	struct ca8210_priv *priv = filp->private_data;
-	uint8_t command[SPI_BUF_SIZE];
+	uint8_t command[CA8210_SPI_BUF_SIZE];
 
 	if (copy_from_user(command, in_buf, len))
 		return 0;
@@ -2825,40 +2680,40 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 
 	sema_init (&priv->cas_ctl.spi_sem, 1);
 
-	priv->cas_ctl.tx_buf = kmalloc(SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.tx_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (priv->cas_ctl.tx_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
-	memset(priv->cas_ctl.tx_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.tx_in_buf = kmalloc(SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.tx_in_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (priv->cas_ctl.tx_in_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
-	memset(priv->cas_ctl.tx_in_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_buf = kmalloc(SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (priv->cas_ctl.rx_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
-	memset(priv->cas_ctl.rx_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_out_buf = kmalloc (SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_out_buf = kmalloc (CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (priv->cas_ctl.rx_out_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
-	memset(priv->cas_ctl.rx_out_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_out_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_final_buf = kmalloc (SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_final_buf = kmalloc (CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (priv->cas_ctl.rx_final_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
-	memset(priv->cas_ctl.rx_final_buf, '\xff', SPI_BUF_SIZE);
+	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
 	priv->cas_ctl.tx_transfer.tx_nbits = 1; /* 1 MOSI line */
 	priv->cas_ctl.tx_transfer.rx_nbits = 1; /* 1 MISO line */
@@ -2950,7 +2805,7 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 {
 	/* Support channels 11-26 */
-	ca8210_hw->phy->supported.channels[0] = M_ValidChannels;
+	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
 	ca8210_hw->phy->current_channel = 18;
 	ca8210_hw->phy->current_page = 0;
 	ca8210_hw->phy->transmit_power = 8;
@@ -2986,7 +2841,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 	int status;
 	struct ca8210_test *test = &priv->test;
 
-	status = alloc_chrdev_region(&test->char_dev_num, 0, 1, TEST_INT_FILE_NAME);
+	status = alloc_chrdev_region(&test->char_dev_num, 0, 1, CA8210_TEST_INT_FILE_NAME);
 	if(status < 0){
 		dev_crit(&priv->spi->dev, "test_interface: Could not allocate a major number\n");
 		return status;
@@ -3002,7 +2857,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		return status;
 	}
 
-	test->cl = class_create(THIS_MODULE, TEST_INT_FILE_NAME);
+	test->cl = class_create(THIS_MODULE, CA8210_TEST_INT_FILE_NAME);
 	if(IS_ERR(test->cl)){
 		cdev_del(&test->char_dev_cdev);
 		unregister_chrdev_region(test->char_dev_num, 1);
@@ -3011,7 +2866,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		return PTR_ERR(test->cl);
 	}
 
-	test->de = device_create(test->cl, NULL, test->char_dev_num, NULL, TEST_INT_FILE_NAME);
+	test->de = device_create(test->cl, NULL, test->char_dev_num, NULL, CA8210_TEST_INT_FILE_NAME);
 	if(IS_ERR(test->de)){
 		cdev_del(&test->char_dev_cdev);
 		unregister_chrdev_region(test->char_dev_num, 1);
@@ -3021,7 +2876,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		return PTR_ERR(test->de);
 	}
 
-	return kfifo_alloc(&test->up_fifo, TEST_INT_FIFO_SIZE, GFP_KERNEL);
+	return kfifo_alloc(&test->up_fifo, CA8210_TEST_INT_FIFO_SIZE, GFP_KERNEL);
 }
 
 /**
