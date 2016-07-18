@@ -425,17 +425,6 @@ struct SecSpec {
 	uint8_t         KeyIndex;
 };
 
-struct PanDescriptor {
-	struct FullAddr Coord;
-	uint8_t         LogicalChannel;
-	uint8_t         SuperframeSpec[2];
-	uint8_t         GTSPermit;
-	uint8_t         LinkQuality;
-	uint8_t         TimeStamp[4];
-	uint8_t         SecurityFailure;
-	struct SecSpec  Security;
-};
-
 /* downlink functions parameter set definitions */
 struct MCPS_DATA_request_pset {
 	uint8_t         SrcAddrMode;
@@ -446,77 +435,11 @@ struct MCPS_DATA_request_pset {
 	uint8_t         Msdu[MAX_DATA_SIZE];
 };
 
-struct MLME_ASSOCIATE_request_pset {
-	uint8_t         LogicalChannel;
-	struct FullAddr Dst;
-	uint8_t         CapabilityInfo;
-	struct SecSpec  Security;
-};
-
-struct MLME_ASSOCIATE_response_pset {
-	uint8_t         DeviceAddress[8];
-	uint8_t         AssocShortAddress[2];
-	uint8_t         Status;
-	struct SecSpec  Security;
-};
-
-struct MLME_DISASSOCIATE_request_pset {
-	struct FullAddr DevAddr;
-	uint8_t         DisassociateReason;
-	uint8_t         TxIndirect;
- 	struct SecSpec  Security;
-};
-
-struct MLME_GET_request_pset {
-	uint8_t         PIBAttribute;
-	uint8_t         PIBAttributeIndex;
-};
-
-struct MLME_ORPHAN_response_pset {
-	uint8_t         OrphanAddress[8];
-	uint8_t         ShortAddress[2];
-	uint8_t         AssociatedMember;
-	struct SecSpec  Security;
-};
-
-struct MLME_POLL_request_pset {
-	struct FullAddr CoordAddress;
-	uint8_t         Interval[2];      /* polling interval in 0.1 seconds res */
-	                                  /* 0 means poll once */
-	                                  /* 0xFFFF means stop polling */
-	struct SecSpec  Security;
-};
-
-struct MLME_RX_ENABLE_request_pset {
-	uint8_t         DeferPermit;
-	uint8_t         RxOnTime[4];
-	uint8_t         RxOnDuration[4];
-};
-
-struct MLME_SCAN_request_pset {
-	uint8_t         ScanType;
-	uint8_t         ScanChannels[4];
-	uint8_t         ScanDuration;
-	struct SecSpec  Security;
-};
-
 struct MLME_SET_request_pset {
 	uint8_t         PIBAttribute;
 	uint8_t         PIBAttributeIndex;
 	uint8_t         PIBAttributeLength;
 	uint8_t         PIBAttributeValue[MAX_ATTRIBUTE_SIZE];
-};
-
-struct MLME_START_request_pset {
-	uint8_t         PANId[2];
-	uint8_t         LogicalChannel;
-	uint8_t         BeaconOrder;
-	uint8_t         SuperframeOrder;
-	uint8_t         PANCoordinator;
-	uint8_t         BatteryLifeExtension;
-	uint8_t         CoordRealignment;
-	struct SecSpec  CoordRealignSecurity;
-	struct SecSpec  BeaconSecurity;
 };
 
 struct HWME_SET_request_pset {
@@ -533,17 +456,6 @@ struct TDME_SETSFR_request_pset {
 	uint8_t         SFRPage;
 	uint8_t         SFRAddress;
 	uint8_t         SFRValue;
-};
-
-struct TDME_GETSFR_request_pset {
-	uint8_t         SFRPage;
-	uint8_t         SFRAddress;
-};
-
-struct TDME_SET_request_pset {
-	uint8_t         TDAttribute;
-	uint8_t         TDAttributeLength;
-	uint8_t         TDAttributeValue[MAX_TDME_ATTRIBUTE_SIZE];
 };
 
 /* uplink functions parameter set definitions */
@@ -570,21 +482,10 @@ struct MAC_Message {
 	uint8_t      Length;
 	union {
 		struct MCPS_DATA_request_pset                      DataReq;
-		struct MLME_ASSOCIATE_request_pset                 AssocReq;
-		struct MLME_ASSOCIATE_response_pset                AssocRsp;
-		struct MLME_DISASSOCIATE_request_pset              DisassocReq;
-		struct MLME_GET_request_pset                       GetReq;
-		struct MLME_ORPHAN_response_pset                   OrphanRsp;
-		struct MLME_POLL_request_pset                      PollReq;
-		struct MLME_RX_ENABLE_request_pset                 RxEnableReq;
-		struct MLME_SCAN_request_pset                      ScanReq;
 		struct MLME_SET_request_pset                       SetReq;
-		struct MLME_START_request_pset                     StartReq;
 		struct HWME_SET_request_pset                       HWMESetReq;
 		struct HWME_GET_request_pset                       HWMEGetReq;
 		struct TDME_SETSFR_request_pset                    TDMESetSFRReq;
-		struct TDME_GETSFR_request_pset                    TDMEGetSFRReq;
-		struct TDME_SET_request_pset                       TDMESetReq;
 		struct HWME_SET_confirm_pset                       HWMESetCnf;
 		struct HWME_GET_confirm_pset                       HWMEGetCnf;
 		struct TDME_SETSFR_confirm_pset                    TDMESetSFRCnf;
