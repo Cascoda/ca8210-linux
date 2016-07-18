@@ -263,6 +263,24 @@
 #define SPI_TDME_SET_REQUEST               (TDME_SET_REQUEST+SPI_SYN)
 #define SPI_TDME_SETSFR_CONFIRM            (TDME_SETSFR_CONFIRM+SPI_S2M+SPI_SYN)
 
+/* TDME SFR addresses */
+/* Page 0 */
+#define CA8210_SFR_PACFG                   (0xB1)
+#define CA8210_SFR_MACCON                  (0xD8)
+#define CA8210_SFR_PACFGIB                 (0xFE)
+/* Page 1 */
+#define CA8210_SFR_LOTXCAL                 (0xBF)
+#define CA8210_SFR_PTHRH                   (0xD1)
+#define CA8210_SFR_PRECFG                  (0xD3)
+#define CA8210_SFR_LNAGX40                 (0xE1)
+#define CA8210_SFR_LNAGX41                 (0xE2)
+#define CA8210_SFR_LNAGX42                 (0xE3)
+#define CA8210_SFR_LNAGX43                 (0xE4)
+#define CA8210_SFR_LNAGX44                 (0xE5)
+#define CA8210_SFR_LNAGX45                 (0xE6)
+#define CA8210_SFR_LNAGX46                 (0xE7)
+#define CA8210_SFR_LNAGX47                 (0xE9)
+
 /******************************************************************************/
 /* Structs/Enums */
 
@@ -1272,27 +1290,27 @@ static uint8_t TDME_ChipInit(void *pDeviceRef)
 {
 	uint8_t status;
 
-	if((status = TDME_SETSFR_request_sync(1, 0xE1, 0x29, pDeviceRef)))  /* LNA Gain Settings */
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX40, 0x29, pDeviceRef)))  /* LNA Gain Settings */
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE2, 0x54, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX41, 0x54, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE3, 0x6C, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX42, 0x6C, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE4, 0x7A, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX43, 0x7A, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE5, 0x84, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX44, 0x84, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE6, 0x8B, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX45, 0x8B, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE7, 0x92, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX46, 0x92, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xE9, 0x96, pDeviceRef)))
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX47, 0x96, pDeviceRef)))
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xD3, 0x5B, pDeviceRef))) /* Preamble Timing Config */
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_PRECFG, 0x5B, pDeviceRef))) /* Preamble Timing Config */
 		return(status);
-	if((status = TDME_SETSFR_request_sync(1, 0xD1, 0x5A, pDeviceRef))) /* Preamble Threshold High */
+	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_PTHRH, 0x5A, pDeviceRef))) /* Preamble Threshold High */
 		return(status);
-	if((status = TDME_SETSFR_request_sync(0, 0xFE, 0x3F, pDeviceRef))) /* Tx Output Power 8 dBm */
+	if((status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFGIB, 0x3F, pDeviceRef))) /* Tx Output Power 8 dBm */
 		return(status);
 
 	return MAC_SUCCESS;
@@ -1329,7 +1347,7 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *pDeviceRef)
 		txcalval = 0xAF;
 	}
 
-	return TDME_SETSFR_request_sync(1, 0xBF, txcalval, pDeviceRef);  /* LO Tx Cal */
+	return TDME_SETSFR_request_sync(1, CA8210_SFR_LOTXCAL, txcalval, pDeviceRef);  /* LO Tx Cal */
 }
 
 /**
@@ -1463,7 +1481,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *pDeviceRef)
 			paib = 0x73; /* 0 dBm: ptrim = 7, itrim = +3 => -6 dBm */
 		}
 		/* write PACFG */
-		status = TDME_SETSFR_request_sync(0, 0xB1, paib, pDeviceRef);
+		status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFG, paib, pDeviceRef);
 	} else {
 		/* Look-Up Table for Setting Current and Frequency Trim values for desired Output Power */
 		if(       txp_val  >  8) {
@@ -1490,7 +1508,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *pDeviceRef)
 			paib = 0x00;
 		}
 		/* write PACFGIB */
-		status = TDME_SETSFR_request_sync(0, 0xFE, paib, pDeviceRef);
+		status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFGIB, paib, pDeviceRef);
 	}
 
 	return status;
@@ -1588,7 +1606,7 @@ static uint8_t MLME_RESET_request_sync(uint8_t SetDefaultPIB, void *pDeviceRef)
 
 	/* reset COORD Bit for Channel Filtering as Coordinator */
 	if (CA8210_MAC_WORKAROUNDS && SetDefaultPIB && (!status))
-		status = TDME_SETSFR_request_sync(0, 0xD8, 0, pDeviceRef);
+		status = TDME_SETSFR_request_sync(0, CA8210_SFR_MACCON, 0, pDeviceRef);
 
 	return status;
 	#undef SIMPLEREQ
@@ -2364,7 +2382,7 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *pDeviceRef)
 		return TDME_ChannelInit(buf[4], pDeviceRef);
 	} else if ((CA8210_MAC_WORKAROUNDS) && (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
 		/* reset COORD Bit for Channel Filtering as Coordinator */
-		return TDME_SETSFR_request_sync(0, 0xD8, 0, pDeviceRef);
+		return TDME_SETSFR_request_sync(0, CA8210_SFR_MACCON, 0, pDeviceRef);
 	}
 	return 0;
 } /* End of EVBMECheckSerialCommand() */
