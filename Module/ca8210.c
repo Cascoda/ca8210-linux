@@ -229,6 +229,7 @@
 #define MLME_START_CONFIRM                    (0x0F)
 #define HWME_SET_CONFIRM                      (0x12)
 #define HWME_GET_CONFIRM                      (0x13)
+#define HWME_WAKEUP_INDICATION		      (0x15)
 #define TDME_SETSFR_CONFIRM                   (0x17)
 
 
@@ -258,6 +259,7 @@
 #define SPI_HWME_GET_REQUEST               (HWME_GET_REQUEST+SPI_SYN)
 #define SPI_HWME_SET_CONFIRM               (HWME_SET_CONFIRM+SPI_S2M+SPI_SYN)
 #define SPI_HWME_GET_CONFIRM               (HWME_GET_CONFIRM+SPI_S2M+SPI_SYN)
+#define SPI_HWME_WAKEUP_INDICATION         (HWME_WAKEUP_INDICATION+SPI_S2M)
 
 #define SPI_TDME_SETSFR_REQUEST            (TDME_SETSFR_REQUEST+SPI_SYN)
 #define SPI_TDME_SET_REQUEST               (TDME_SET_REQUEST+SPI_SYN)
@@ -371,6 +373,7 @@ struct ca8210_test {
 struct ca8210_priv {
 	struct spi_device *spi;
 	struct ieee802154_hw *hw;
+	bool hw_registered;
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
 	struct work_struct async_tx_work, rx_work, irq_work;
@@ -386,6 +389,7 @@ struct ca8210_priv {
 	bool sync_command_pending;
 	struct mutex sync_command_mutex;
 	uint8_t *sync_command_response;
+	bool ca8210_is_awake;
 };
 
 /**
@@ -612,11 +616,32 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 static void ca8210_reset_send(struct spi_device *spi, int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
+	struct ca8210_priv *priv = spi_get_drvdata(spi);
+	unsigned long flags;
+	unsigned long startjiffies;
+
 	#define RESET_OFF 0
 	#define RESET_ON 1
+
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
+	priv->ca8210_is_awake = false;
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, RESET_ON);
+
+	/* Wait until wakeup indication seen */
+	startjiffies = jiffies;
+	spin_lock_irqsave(&priv->lock, flags);
+	while (!priv->ca8210_is_awake) {
+		if (jiffies - startjiffies > msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
+			dev_crit(&spi->dev, "Fatal: No wakeup from ca8210 after reset!\n");
+			break;
+		}
+		spin_unlock_irqrestore(&priv->lock, flags);
+		msleep(1);
+		spin_lock_irqsave(&priv->lock, flags);
+	}
+	spin_unlock_irqrestore(&priv->lock, flags);
+
 	dev_dbg(&spi->dev, "Reset the device\n");
 	#undef RESET_OFF
 	#undef RESET_ON
@@ -671,14 +696,38 @@ static void ca8210_rx_done(struct work_struct *work)
 	mutex_unlock(&priv->sync_command_mutex);
 
 	ca8210_net_rx(priv->hw, buf, len);
-
-	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
-	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
-
-	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
-	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
+	if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
+		dev_notice(&priv->spi->dev, "Wakeup indication received, reason:\n");
+		switch (buf[2]) {
+		case 0:
+			dev_notice(&priv->spi->dev, "Transceiver woken up from Power Up / System Reset\n");
+			break;
+		case 1:
+			dev_notice(&priv->spi->dev, "Watchdog Timer Time-Out\n");
+			break;
+		case 2:
+			dev_notice(&priv->spi->dev, "Transceiver woken up from Power-Off by Sleep Timer Time-Out\n");
+			break;
+		case 3:
+			dev_notice(&priv->spi->dev, "Transceiver woken up from Power-Off by GPIO Activity\n");
+			break;
+		case 4:
+			dev_notice(&priv->spi->dev, "Transceiver woken up from Standby by Sleep Timer Time-Out\n");
+			break;
+		case 5:
+			dev_notice(&priv->spi->dev, "Transceiver woken up from Standby by GPIO Activity\n");
+			break;
+		case 6:
+			dev_notice(&priv->spi->dev, "Sleep-Timer Time-Out in Active Mode\n");
+			break;
+		default:
+			dev_warn(&priv->spi->dev, "Wakeup reason unknown\n");
+			break;
+		}
+		spin_lock_irqsave(&priv->lock, flags);
+		priv->ca8210_is_awake = true;
+		spin_unlock_irqrestore(&priv->lock, flags);
+	}
 }
 
 /**
@@ -2815,10 +2864,12 @@ static int ca8210_remove(struct spi_device *spi_device)
 	}
 	/* get spi_device private data */
 	priv = spi_get_drvdata(spi_device);
-	if(priv){
+	if (priv) {
 		ca8210_dev_com_clear(spi_device->dev.driver_data);
-		if(priv->hw){
-			ieee802154_unregister_hw(priv->hw);
+		if (priv->hw) {
+			if (priv->hw_registered) {
+				ieee802154_unregister_hw(priv->hw);
+			}
 			ieee802154_free_hw(priv->hw);
 			priv->hw = NULL;
 			dev_info(&spi_device->dev, "Unregistered & freed ieee802154_hw.\n");
@@ -2860,18 +2911,13 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->clear_next_spi_rx = false;
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
+	priv->hw_registered = false;
 	mutex_init(&priv->sync_command_mutex);
 	spi_set_drvdata(priv->spi, priv);
 
 	ca8210_test_interface_init(priv);
 	ca8210_hw_setup(hw);
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
-
-	ret = ieee802154_register_hw(hw);
-	if (ret) {
-		dev_crit(&spi_device->dev, "ieee802154_register_hw failed\n");
-		goto error;
-	}
 
 	pdata = kmalloc(sizeof(struct ca8210_platform_data), GFP_KERNEL);
 	if (pdata == NULL) {
@@ -2898,15 +2944,14 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 
-	ca8210_reset_send(priv->spi, 50);
-
 	ret = ca8210_interrupt_init(priv->spi);
 	if (ret) {
 		dev_crit(&spi_device->dev, "ca8210_interrupt_init failed\n");
 		goto error;
 	}
 
-	mdelay(1000);	/* Time to process wakeup indication */
+	ca8210_reset_send(priv->spi, 1);
+
 	ret = TDME_ChipInit(priv->spi);
 	if (ret) {
 		dev_crit(&spi_device->dev, "TDME_ChipInit failed\n");
@@ -2925,6 +2970,13 @@ static int ca8210_probe(struct spi_device *spi_device)
 			goto error;
 		}
 	}
+
+	ret = ieee802154_register_hw(hw);
+	if (ret) {
+		dev_crit(&spi_device->dev, "ieee802154_register_hw failed\n");
+		goto error;
+	}
+	priv->hw_registered = true;
 
 	return 0;
 error:
