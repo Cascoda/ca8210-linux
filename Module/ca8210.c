@@ -52,6 +52,7 @@
 
 #include <linux/cdev.h>
 #include <linux/clk-provider.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/ieee802154.h>
@@ -333,10 +334,7 @@ struct cas_control {
  * char driver.
  */
 struct ca8210_test {
-	dev_t char_dev_num;
-	struct cdev char_dev_cdev;
-	struct class* cl;
-	struct device* de;
+	struct dentry *ca8210_dfs_spi_int;
 	struct kfifo up_fifo;
 };
 
@@ -2292,8 +2290,7 @@ static const struct ieee802154_ops ca8210_phy_ops = {
  */
 static int ca8210_test_int_open(struct inode *inodp, struct file *filp)
 {
-	struct ca8210_test *test = container_of(inodp->i_cdev, struct ca8210_test, char_dev_cdev);
-	struct ca8210_priv *priv = container_of(test, struct ca8210_priv, test);
+	struct ca8210_priv *priv = inodp->i_private;
 	filp->private_data = priv;
 	return 0;
 }
@@ -2783,45 +2780,39 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
  */
 static int ca8210_test_interface_init(struct ca8210_priv *priv)
 {
-	int status;
 	struct ca8210_test *test = &priv->test;
+	char node_name[32];
 
-	status = alloc_chrdev_region(&test->char_dev_num, 0, 1, CA8210_TEST_INT_FILE_NAME);
-	if (status < 0) {
-		dev_crit(&priv->spi->dev, "test_interface: Could not allocate a major number\n");
-		return status;
+	snprintf(
+		node_name,
+		sizeof(node_name),
+		"ca8210@%d_%d",
+		priv->spi->master->bus_num,
+		priv->spi->chip_select
+	);
+
+	test->ca8210_dfs_spi_int = debugfs_create_file(
+		node_name,
+		S_IRUSR | S_IWUSR,
+		NULL,
+		priv,
+		&test_int_fops
+	);
+	if (IS_ERR(test->ca8210_dfs_spi_int)) {
+		dev_err(
+			&priv->spi->dev,
+			"Error %ld when creating debugfs node\n",
+			PTR_ERR(test->ca8210_dfs_spi_int)
+		);
+		return PTR_ERR(test->ca8210_dfs_spi_int);
 	}
+	debugfs_create_symlink("ca8210", NULL, node_name);
 
-	cdev_init(&test->char_dev_cdev, &test_int_fops);
-	test->char_dev_cdev.owner = THIS_MODULE;
-
-	status = cdev_add(&test->char_dev_cdev, test->char_dev_num, 1);
-	if (status < 0) {
-		unregister_chrdev_region(test->char_dev_num, 1);
-		dev_crit(&priv->spi->dev, "test_interface: Unable to register char dev\n");
-		return status;
-	}
-
-	test->cl = class_create(THIS_MODULE, CA8210_TEST_INT_FILE_NAME);
-	if (IS_ERR(test->cl)) {
-		cdev_del(&test->char_dev_cdev);
-		unregister_chrdev_region(test->char_dev_num, 1);
-
-		dev_crit(&priv->spi->dev, "test_interface: Could not create device class\n");
-		return PTR_ERR(test->cl);
-	}
-
-	test->de = device_create(test->cl, NULL, test->char_dev_num, NULL, CA8210_TEST_INT_FILE_NAME);
-	if (IS_ERR(test->de)) {
-		cdev_del(&test->char_dev_cdev);
-		unregister_chrdev_region(test->char_dev_num, 1);
-		class_destroy(test->cl);
-
-		dev_crit(&priv->spi->dev, "test_interface: Could not create device\n");
-		return PTR_ERR(test->de);
-	}
-
-	return kfifo_alloc(&test->up_fifo, CA8210_TEST_INT_FIFO_SIZE, GFP_KERNEL);
+	return kfifo_alloc(
+		&test->up_fifo,
+		CA8210_TEST_INT_FIFO_SIZE,
+		GFP_KERNEL
+	);
 }
 
 /**
@@ -2831,10 +2822,9 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 static void ca8210_test_interface_clear(struct ca8210_priv *priv)
 {
 	struct ca8210_test *test = &priv->test;
-	cdev_del(&test->char_dev_cdev);
-	unregister_chrdev_region(test->char_dev_num, 1);
-	device_destroy(test->cl, test->char_dev_num);
-	class_destroy(test->cl);
+	if (!IS_ERR(test->ca8210_dfs_spi_int)) {
+		debugfs_remove(test->ca8210_dfs_spi_int);
+	}
 	kfifo_free(&test->up_fifo);
 	dev_info(&priv->spi->dev, "Test interface removed\n");
 }
