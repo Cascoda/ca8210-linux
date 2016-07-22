@@ -515,7 +515,7 @@ static int link_to_linux_err(int link_status)
 		/* status is already a Linux code */
 		return link_status;
 	}
-	switch(link_status){
+	switch (link_status) {
 	case MAC_SUCCESS:
 	case MAC_REALIGNMENT:
 		return 0;
@@ -879,7 +879,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			msleep(1);
 		}
-	} while(1);
+	} while (1);
 
 	if (down_interruptible(&priv->cas_ctl.spi_sem))
 		return;
@@ -980,7 +980,7 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		spi_message_add_tail(&priv->cas_ctl.tx_transfer, &priv->cas_ctl.tx_msg);
 
 		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
-		if(status < 0) {
+		if (status < 0) {
 			dev_crit(&spi->dev, "Status %d from spi_sync in write\n", status);
 		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == '\xF0') {
 			/* ca8210 is busy */
@@ -1434,25 +1434,25 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *pDeviceRef)
 		status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFG, paib, pDeviceRef);
 	} else {
 		/* Look-Up Table for Setting Current and Frequency Trim values for desired Output Power */
-		if(       txp_val  >  8) {
+		if (       txp_val  >  8) {
 			paib = 0x3F;
-		} else if(txp_val ==  8) {
+		} else if (txp_val ==  8) {
 			paib = 0x32;
-		} else if(txp_val ==  7) {
+		} else if (txp_val ==  7) {
 			paib = 0x22;
-		} else if(txp_val ==  6) {
+		} else if (txp_val ==  6) {
 			paib = 0x18;
-		} else if(txp_val ==  5) {
+		} else if (txp_val ==  5) {
 			paib = 0x10;
-		} else if(txp_val ==  4) {
+		} else if (txp_val ==  4) {
 			paib = 0x0C;
-		} else if(txp_val ==  3) {
+		} else if (txp_val ==  3) {
 			paib = 0x08;
-		} else if(txp_val ==  2) {
+		} else if (txp_val ==  2) {
 			paib = 0x05;
-		} else if(txp_val ==  1) {
+		} else if (txp_val ==  1) {
 			paib = 0x03;
-		} else if(txp_val ==  0) {
+		} else if (txp_val ==  0) {
 			paib = 0x01;
 		} else         /*  <  0 */ {
 			paib = 0x00;
@@ -1483,7 +1483,7 @@ static uint8_t MCPS_DATA_request(
 	uint8_t          SrcAddrMode,
 	uint8_t          DstAddrMode,
 	uint16_t         DstPANId,
-	union MacAddr  *pDstAddr,
+	union MacAddr   *pDstAddr,
 	uint8_t          MsduLength,
 	uint8_t         *pMsdu,
 	uint8_t          MsduHandle,
@@ -2041,7 +2041,7 @@ static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
 
 	priv->sync_tx_pending = true;
 
-	while(priv->sync_tx_pending){
+	while (priv->sync_tx_pending) {
 		msleep(1);
 	}
 
@@ -2593,7 +2593,7 @@ static int ca8210_interrupt_init(struct spi_device *spi)
 	                                    0);
 
 	pdata->irq_id = gpio_to_irq(pdata->gpio_irq);
-	if (pdata->irq_id < 0){
+	if (pdata->irq_id < 0) {
 		dev_crit(&spi->dev, "Could not get irq for gpio pin %d\n",
 			pdata->gpio_irq);
 		gpio_free(pdata->gpio_irq);
@@ -2787,7 +2787,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 	struct ca8210_test *test = &priv->test;
 
 	status = alloc_chrdev_region(&test->char_dev_num, 0, 1, CA8210_TEST_INT_FILE_NAME);
-	if(status < 0){
+	if (status < 0) {
 		dev_crit(&priv->spi->dev, "test_interface: Could not allocate a major number\n");
 		return status;
 	}
@@ -2796,14 +2796,14 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 	test->char_dev_cdev.owner = THIS_MODULE;
 
 	status = cdev_add(&test->char_dev_cdev, test->char_dev_num, 1);
-	if(status < 0){
+	if (status < 0) {
 		unregister_chrdev_region(test->char_dev_num, 1);
 		dev_crit(&priv->spi->dev, "test_interface: Unable to register char dev\n");
 		return status;
 	}
 
 	test->cl = class_create(THIS_MODULE, CA8210_TEST_INT_FILE_NAME);
-	if(IS_ERR(test->cl)){
+	if (IS_ERR(test->cl)) {
 		cdev_del(&test->char_dev_cdev);
 		unregister_chrdev_region(test->char_dev_num, 1);
 
@@ -2812,7 +2812,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 	}
 
 	test->de = device_create(test->cl, NULL, test->char_dev_num, NULL, CA8210_TEST_INT_FILE_NAME);
-	if(IS_ERR(test->de)){
+	if (IS_ERR(test->de)) {
 		cdev_del(&test->char_dev_cdev);
 		unregister_chrdev_region(test->char_dev_num, 1);
 		class_destroy(test->cl);
