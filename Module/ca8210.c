@@ -354,10 +354,6 @@ struct ca8210_test {
  * @nextmsduhandle:         msdu handle to pass to the 15.4 MAC layer for the
  *                          next transmission
  * @clk:                    external clock provided by the ca8210
- * @clear_next_spi_rx:      whether the next received spi packet should be
- *                          cleared from the higher layer buffer, used for
- *                          packets received at inopportune times (duplex mode
- *                          during a synchronous command)
  * @cas_ctl:                spi control data section for this instance
  * @lastDSN:                sequence number of last data packet received, for
  *                          resend detection
@@ -379,7 +375,6 @@ struct ca8210_priv {
 	struct sk_buff *tx_skb;
 	uint8_t nextmsduhandle;
 	struct clk *clk;
-	bool clear_next_spi_rx;
 	struct cas_control cas_ctl;
 	int lastDSN;
 	struct ca8210_test test;
@@ -1001,16 +996,6 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
 	    priv->cas_ctl.tx_in_buf[0] != SPI_NACK) {
 		/* Received start of rx packet during transfer */
-		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
-		spin_lock(&priv->lock);
-		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
-
-		priv->clear_next_spi_rx = true;
-
-		dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
-		spin_unlock(&priv->lock);
-		dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
-
 		#define NUM_DATABYTES_SO_FAR (len-2)
 		if (priv->cas_ctl.tx_in_buf[1] > NUM_DATABYTES_SO_FAR) {
 			/* Need to read rest of data of packet */
@@ -2898,7 +2883,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->spi = spi_device;
 	hw->parent = &spi_device->dev;
 	spin_lock_init(&priv->lock);
-	priv->clear_next_spi_rx = false;
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
