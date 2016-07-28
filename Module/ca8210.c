@@ -66,7 +66,6 @@
 #include <linux/semaphore.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/smp.h>
 #include <linux/spi/spi.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
@@ -680,11 +679,8 @@ static void ca8210_rx_done(struct work_struct *work)
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
-	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
 	if (len > CA8210_SPI_BUF_SIZE)
@@ -697,9 +693,7 @@ static void ca8210_rx_done(struct work_struct *work)
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 		return;
@@ -798,15 +792,12 @@ static void ca8210_spi_finishRead(void *arg)
 	struct spi_device *spi = arg;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	dev_dbg(&spi->dev, "ca8210_spi_finishRead called\n");
 
 	up(&priv->cas_ctl.spi_sem);
 
-	dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	for (i = 0; i < priv->cas_ctl.rx_final_buf[1]; i++) {
 		priv->cas_ctl.rx_final_buf[2+i] = priv->cas_ctl.rx_buf[i];
@@ -827,9 +818,7 @@ static void ca8210_spi_finishRead(void *arg)
 	queue_work(priv->rx_workqueue, &priv->rx_work);
 
 
- 	dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 }
 
 /**
@@ -925,33 +914,18 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 {
 	int status;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
-	unsigned cpu = smp_processor_id();
 
 	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_startRead- called\n");
 
 	do {
-		dev_dbg(&spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 		spin_lock(&priv->lock);
-		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (priv->cas_ctl.rx_final_buf[0] == SPI_IDLE) {
 			/* spi receive buffer cleared of last rx */
-			dev_dbg(
-				&spi->dev,
-				"Releasing spinlock on CPU%d\n",
-				cpu
-			);
 			spin_unlock(&priv->lock);
-			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			break;
 		} else {
 			/* spi receive buffer still in use */
-			dev_dbg(
-				&spi->dev,
-				"Releasing spinlock on CPU%d\n",
-				cpu
-			);
 			spin_unlock(&priv->lock);
-			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			msleep(1);
 		}
 	} while (1);
@@ -1002,7 +976,6 @@ static int ca8210_spi_write(
 	bool dummy;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	if (spi == NULL) {
 		dev_crit(
@@ -1943,7 +1916,6 @@ static int ca8210_async_xmit_complete(
 {
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	if (status) {
 		dev_err(
@@ -1977,15 +1949,11 @@ static int ca8210_async_xmit_complete(
 		);
 	}
 
-	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = false;
 
-	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	priv->nextmsduhandle++;
 	ieee802154_xmit_complete(priv->hw, priv->tx_skb, true);
@@ -2097,43 +2065,24 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 {
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	dev_dbg(&priv->spi->dev, "ca8210_net_rx(), CmdID = %d\n", command[0]);
 
 
 	if (command[0] == SPI_MCPS_DATA_INDICATION) {
 		/* Received data */
-		dev_dbg(
-			&priv->spi->dev,
-			"Trying to get spinlock on CPU%d\n",
-			cpu
-		);
 		spin_lock_irqsave(&priv->lock, flags);
-		dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (command[26] == priv->last_dsn) {
 			dev_dbg(
 				&priv->spi->dev,
 				"DSN %d resend received, ignoring...\n",
 				command[26]
 			);
-			dev_dbg(
-				&priv->spi->dev,
-				"Releasing spinlock on CPU%d\n",
-				cpu
-			);
 			spin_unlock_irqrestore(&priv->lock, flags);
-			dev_dbg(
-				&priv->spi->dev,
-				"Released spinlock on CPU%d\n",
-				cpu
-			);
 			return 0;
 		}
 		priv->last_dsn = command[26];
-		dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 		spin_unlock_irqrestore(&priv->lock, flags);
-		dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 		return ca8210_skb_rx(hw, len-2, command+2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
 		if (priv->async_tx_pending) {
@@ -2209,7 +2158,6 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 		async_tx_work
 	);
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	if (priv->tx_skb == NULL) {
 		return;
@@ -2221,15 +2169,11 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 	                   &priv->async_tx_timeout_work,
 	                   msecs_to_jiffies(CA8210_DATA_CNF_TIMEOUT));
 
-	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = true;
 
-	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 }
 
 /**
@@ -2250,19 +2194,14 @@ static void ca8210_async_tx_timeout_worker(struct work_struct *work)
 		async_tx_timeout_work
 	);
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	dev_err(&priv->spi->dev, "data confirm timed out\n");
 
-	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
 	spin_lock_irqsave(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 
 	priv->async_tx_pending = false;
 
-	dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
 	spin_unlock_irqrestore(&priv->lock, flags);
-	dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
 
 	ieee802154_wake_queue(priv->hw);
 }
