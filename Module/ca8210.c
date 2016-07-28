@@ -19,7 +19,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  *
  *******************************************************************************
  *
@@ -178,7 +179,7 @@
 #define MAC_AUTO_REQUEST_SECURITY_LEVEL   (0x78)
 #define MAC_AUTO_REQUEST_KEY_ID_MODE      (0x79)
 
-#define NS_IEEE_ADDRESS                   (0xFF)    /* Non-standard IEEE address */
+#define NS_IEEE_ADDRESS                   (0xFF) /* Non-standard IEEE address */
 
 /* MAC Address Mode Definitions */
 #define MAC_MODE_NO_ADDR                ((unsigned)0x00)
@@ -186,9 +187,9 @@
 #define MAC_MODE_LONG_ADDR              ((unsigned)0x03)
 
 /* MAC constants */
-#define MAX_PHY_PACKET_SIZE               (127)
-#define MAX_BEACON_OVERHEAD               (75)
-#define MAX_BEACON_PAYLOAD_LENGTH         (MAX_PHY_PACKET_SIZE-MAX_BEACON_OVERHEAD)
+#define MAX_PHY_PACKET_SIZE            (127)
+#define MAX_BEACON_OVERHEAD            (75)
+#define MAX_BEACON_PAYLOAD_LENGTH      (MAX_PHY_PACKET_SIZE-MAX_BEACON_OVERHEAD)
 
 #define MAX_ATTRIBUTE_SIZE              (250)
 #define MAX_DATA_SIZE                   (114)
@@ -350,21 +351,21 @@ struct ca8210_test {
  * @rx_work:                work object for processing a single received packet
  * @irq_work:               work object for a single irq
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
- *                          transmission timeout
+ *                           transmission timeout
  * @tx_skb:                 current socket buffer to transmit
  * @nextmsduhandle:         msdu handle to pass to the 15.4 MAC layer for the
- *                          next transmission
+ *                           next transmission
  * @clk:                    external clock provided by the ca8210
  * @cas_ctl:                spi control data section for this instance
- * @last_dsn:                sequence number of last data packet received, for
- *                          resend detection
+ * @last_dsn:               sequence number of last data packet received, for
+ *                           resend detection
  * @test:                   test interface data section for this instance
  * @async_tx_pending:       true if an asynchronous transmission was started and
- *                          is not complete
+ *                           is not complete
  * @sync_tx_pending:        true if a synchronous (from driver perspective)
- *                          transmission was started and is not complete
+ *                           transmission was started and is not complete
  * @sync_command_pending:   true if waiting for a synchronous (Cascoda API)
- *                          response
+ *                           response
  * @sync_command_mutex:     mutex controlling access to sync command objects
  * @sync_command_response:  pointer to buffer to fill with sync response
  * @ca8210_is_awake:        true if ca8210 is initialised, ready for comms
@@ -484,17 +485,17 @@ struct mac_message {
 	uint8_t      command_id;
 	uint8_t      length;
 	union {
-		struct MCPS_DATA_request_pset                      data_req;
-		struct MLME_SET_request_pset                       set_req;
-		struct HWME_SET_request_pset                       hwme_set_req;
-		struct HWME_GET_request_pset                       hwme_get_req;
-		struct TDME_SETSFR_request_pset                    tdme_set_sfr_req;
-		struct HWME_SET_confirm_pset                       hwme_set_cnf;
-		struct HWME_GET_confirm_pset                       hwme_get_cnf;
-		struct TDME_SETSFR_confirm_pset                    tdme_set_sfr_cnf;
-		uint8_t                                            u8param;
-		uint8_t                                            status;
-		uint8_t                                            payload[254];
+		struct MCPS_DATA_request_pset       data_req;
+		struct MLME_SET_request_pset        set_req;
+		struct HWME_SET_request_pset        hwme_set_req;
+		struct HWME_GET_request_pset        hwme_get_req;
+		struct TDME_SETSFR_request_pset     tdme_set_sfr_req;
+		struct HWME_SET_confirm_pset        hwme_set_cnf;
+		struct HWME_GET_confirm_pset        hwme_get_cnf;
+		struct TDME_SETSFR_confirm_pset     tdme_set_sfr_cnf;
+		uint8_t                             u8param;
+		uint8_t                             status;
+		uint8_t                             payload[254];
 	} pdata;
 };
 
@@ -582,14 +583,21 @@ static int link_to_linux_err(int link_status)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_test_int_driver_write(const uint8_t *buf, size_t len, void *spi)
+static int ca8210_test_int_driver_write(
+	const uint8_t  *buf,
+	size_t          len,
+	void           *spi
+)
 {
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_test *test = &priv->test;
 	char *fifo_buffer;
 	int i;
 
-	dev_dbg(&priv->spi->dev, "test_interface: Buffering upstream message:\n");
+	dev_dbg(
+		&priv->spi->dev,
+		"test_interface: Buffering upstream message:\n"
+	);
 	for (i = 0; i < len; i++) {
 		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
 	}
@@ -605,7 +613,11 @@ static int ca8210_test_int_driver_write(const uint8_t *buf, size_t len, void *sp
 /* SPI Operation */
 
 static int ca8210_spi_writeDummy(struct spi_device *spi);
-static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len);
+static int ca8210_net_rx(
+	struct ieee802154_hw  *hw,
+	uint8_t               *command,
+	size_t                 len
+);
 
 /**
  * ca8210_reset_send() - Hard resets the ca8210 for a given time
@@ -631,8 +643,12 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 	startjiffies = jiffies;
 	spin_lock_irqsave(&priv->lock, flags);
 	while (!priv->ca8210_is_awake) {
-		if (jiffies - startjiffies > msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
-			dev_crit(&spi->dev, "Fatal: No wakeup from ca8210 after reset!\n");
+		if (jiffies - startjiffies >
+		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
+			dev_crit(
+				&spi->dev,
+				"Fatal: No wakeup from ca8210 after reset!\n"
+			);
 			break;
 		}
 		spin_unlock_irqrestore(&priv->lock, flags);
@@ -656,7 +672,11 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
  */
 static void ca8210_rx_done(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(work, struct ca8210_priv, rx_work);
+	struct ca8210_priv *priv = container_of(
+		work,
+		struct ca8210_priv,
+		rx_work
+	);
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
@@ -668,7 +688,11 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
 	if (len > CA8210_SPI_BUF_SIZE)
-		dev_crit(&priv->spi->dev, "Received packet len (%d) erroneously long\n", len);
+		dev_crit(
+			&priv->spi->dev,
+			"Received packet len (%d) erroneously long\n",
+			len
+		);
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -684,7 +708,10 @@ static void ca8210_rx_done(struct work_struct *work)
 		if (priv->sync_command_response == NULL) {
 			priv->sync_command_pending = false;
 			mutex_unlock(&priv->sync_command_mutex);
-			dev_crit(&priv->spi->dev, "Sync command provided no response buffer\n");
+			dev_crit(
+				&priv->spi->dev,
+				"Sync command provided no response buffer\n"
+			);
 			return;
 		}
 		memcpy(priv->sync_command_response, buf, len);
@@ -696,28 +723,56 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	ca8210_net_rx(priv->hw, buf, len);
 	if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
-		dev_notice(&priv->spi->dev, "Wakeup indication received, reason:\n");
+		dev_notice(
+			&priv->spi->dev,
+			"Wakeup indication received, reason:\n"
+		);
 		switch (buf[2]) {
 		case 0:
-			dev_notice(&priv->spi->dev, "Transceiver woken up from Power Up / System Reset\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Transceiver woken up from Power Up / " \
+				"System Reset\n"
+			);
 			break;
 		case 1:
-			dev_notice(&priv->spi->dev, "Watchdog Timer Time-Out\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Watchdog Timer Time-Out\n"
+			);
 			break;
 		case 2:
-			dev_notice(&priv->spi->dev, "Transceiver woken up from Power-Off by Sleep Timer Time-Out\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Transceiver woken up from Power-Off by " \
+				"Sleep Timer Time-Out\n");
 			break;
 		case 3:
-			dev_notice(&priv->spi->dev, "Transceiver woken up from Power-Off by GPIO Activity\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Transceiver woken up from Power-Off by " \
+				"GPIO Activity\n"
+			);
 			break;
 		case 4:
-			dev_notice(&priv->spi->dev, "Transceiver woken up from Standby by Sleep Timer Time-Out\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Transceiver woken up from Standby by " \
+				"Sleep Timer Time-Out\n"
+			);
 			break;
 		case 5:
-			dev_notice(&priv->spi->dev, "Transceiver woken up from Standby by GPIO Activity\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Transceiver woken up from Standby by " \
+				"GPIO Activity\n"
+			);
 			break;
 		case 6:
-			dev_notice(&priv->spi->dev, "Sleep-Timer Time-Out in Active Mode\n");
+			dev_notice(
+				&priv->spi->dev,
+				"Sleep-Timer Time-Out in Active Mode\n"
+			);
 			break;
 		default:
 			dev_warn(&priv->spi->dev, "Wakeup reason unknown\n");
@@ -745,7 +800,7 @@ static void ca8210_spi_finishRead(void *arg)
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
-	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_finishRead- called\n");
+	dev_dbg(&spi->dev, "ca8210_spi_finishRead called\n");
 
 	up(&priv->cas_ctl.spi_sem);
 
@@ -757,8 +812,12 @@ static void ca8210_spi_finishRead(void *arg)
 		priv->cas_ctl.rx_final_buf[2+i] = priv->cas_ctl.rx_buf[i];
 	}
 
-	dev_dbg(&spi->dev, "device_comm: command ID = %#03x length = %#03x	Data:",
-		priv->cas_ctl.rx_final_buf[0], priv->cas_ctl.rx_final_buf[1]);
+	dev_dbg(
+		&spi->dev,
+		"device_comm: command ID = %#03x length = %#03x Data:",
+		priv->cas_ctl.rx_final_buf[0],
+		priv->cas_ctl.rx_final_buf[1]
+	);
 
 	for (i = 2; i < priv->cas_ctl.rx_final_buf[1] + 2; i++) {
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.rx_final_buf[i]);
@@ -787,7 +846,7 @@ static void ca8210_spi_continueRead(void *arg)
 	struct spi_device *spi = arg;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 
-	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_continueRead- called\n");
+	dev_dbg(&spi->dev, "ca8210_spi_continueRead called\n");
 
 	spi_message_init(&priv->cas_ctl.rx_msg);
 	priv->cas_ctl.rx_msg.spi = spi;
@@ -807,13 +866,15 @@ static void ca8210_spi_continueRead(void *arg)
 		}
 
 		/* Regular data read start */
-		priv->cas_ctl.data_left_to_receive = (int) priv->cas_ctl.rx_buf[1];
+		priv->cas_ctl.data_left_to_receive = \
+			(int) priv->cas_ctl.rx_buf[1];
 		priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
 		priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
 	}
 
 	#define SPLIT_RX_LEN 64
-	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf + priv->cas_ctl.data_received_so_far;
+	priv->cas_ctl.rx_transfer.rx_buf = \
+		priv->cas_ctl.rx_buf + priv->cas_ctl.data_received_so_far;
 	if (priv->cas_ctl.data_left_to_receive > SPLIT_RX_LEN) {
 		/* Middle of data */
 		priv->cas_ctl.rx_transfer.len = SPLIT_RX_LEN;
@@ -826,13 +887,16 @@ static void ca8210_spi_continueRead(void *arg)
 		priv->cas_ctl.data_left_to_receive -= SPLIT_RX_LEN;
 	} else {
 		/* End of data */
-		priv->cas_ctl.rx_transfer.len = priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_msg.frame_length = priv->cas_ctl.data_left_to_receive;
+		priv->cas_ctl.rx_transfer.len = \
+			priv->cas_ctl.data_left_to_receive;
+		priv->cas_ctl.rx_msg.frame_length = \
+			priv->cas_ctl.data_left_to_receive;
 		priv->cas_ctl.rx_transfer.cs_change = 0;
 		priv->cas_ctl.rx_transfer.delay_usecs = 0;
 		priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
 		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far += priv->cas_ctl.data_left_to_receive;
+		priv->cas_ctl.data_received_so_far += \
+			priv->cas_ctl.data_left_to_receive;
 		priv->cas_ctl.data_left_to_receive = 0;
 	}
 	#undef SPLIT_RX_LEN
@@ -842,7 +906,11 @@ static void ca8210_spi_continueRead(void *arg)
 	status = spi_async(spi, &priv->cas_ctl.rx_msg);
 
 	if (status) {
-		dev_crit(&spi->dev, "status %d from spi_async in continue read\n", status);
+		dev_crit(
+			&spi->dev,
+			"status %d from spi_async in continue read\n",
+			status
+		);
 	}
 }
 
@@ -867,13 +935,21 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 		dev_dbg(&spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (priv->cas_ctl.rx_final_buf[0] == SPI_IDLE) {
 			/* spi receive buffer cleared of last rx */
-			dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(
+				&spi->dev,
+				"Releasing spinlock on CPU%d\n",
+				cpu
+			);
 			spin_unlock(&priv->lock);
 			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			break;
 		} else {
 			/* spi receive buffer still in use */
-			dev_dbg(&spi->dev, "Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(
+				&spi->dev,
+				"Releasing spinlock on CPU%d\n",
+				cpu
+			);
 			spin_unlock(&priv->lock);
 			dev_dbg(&spi->dev, "Released spinlock on CPU%d\n", cpu);
 			msleep(1);
@@ -899,7 +975,11 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 
 	status = spi_async(spi, &priv->cas_ctl.rx_msg);
 	if (status) {
-		dev_crit(&spi->dev, "status %d from spi_async in start read\n", status);
+		dev_crit(
+			&spi->dev,
+			"status %d from spi_async in start read\n",
+			status
+		);
 	}
 }
 
@@ -911,7 +991,11 @@ static void ca8210_spi_startRead(struct spi_device *spi)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t len)
+static int ca8210_spi_write(
+	struct spi_device  *spi,
+	const uint8_t      *buf,
+	size_t              len
+)
 {
 	int status = 0;
 	int i;
@@ -921,7 +1005,10 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	unsigned cpu = smp_processor_id();
 
 	if (spi == NULL) {
-		dev_crit(&spi->dev, "NULL spi device passed to ca8210_spi_write\n");
+		dev_crit(
+			&spi->dev,
+			"NULL spi device passed to ca8210_spi_write\n"
+		);
 		return -ENODEV;
 	}
 
@@ -929,7 +1016,8 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		dummy = true;
 	} else {
 		dummy = false;
-		/* Hold off on servicing interrupts, will get read during write anyway */
+		/* Hold off on servicing interrupts, will get read during write
+		 * anyway */
 		local_irq_save(flags);
 		if (down_interruptible(&priv->cas_ctl.spi_sem)) {
 			return -ERESTARTSYS;
@@ -943,8 +1031,12 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 	memcpy(priv->cas_ctl.tx_buf, buf, len);
 
-	dev_dbg(&spi->dev, "device_comm: command ID = %#03x length = %#03x	Data:\n",
-		priv->cas_ctl.tx_buf[0], priv->cas_ctl.tx_buf[1]);
+	dev_dbg(
+		&spi->dev,
+		"device_comm: command ID = %#03x length = %#03x Data:\n",
+		priv->cas_ctl.tx_buf[0],
+		priv->cas_ctl.tx_buf[1]
+	);
 
 	for (i = 2; i < len; i++) {
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_buf[i]);
@@ -968,19 +1060,26 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		}
 
 		if (!dummy) {
-			/* Regular transmission, keep CS asserted in case of incomplete concurrent
-			   read */
+			/* Regular transmission, keep CS asserted in case of
+			 * incomplete concurrent read */
 			priv->cas_ctl.tx_transfer.cs_change = 1;
 		} else {
 			/* dummy transmission, de-assert CS */
 			priv->cas_ctl.tx_transfer.cs_change = 0;
 		}
 
-		spi_message_add_tail(&priv->cas_ctl.tx_transfer, &priv->cas_ctl.tx_msg);
+		spi_message_add_tail(
+			&priv->cas_ctl.tx_transfer,
+			&priv->cas_ctl.tx_msg
+		);
 
 		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
 		if (status < 0) {
-			dev_crit(&spi->dev, "status %d from spi_sync in write\n", status);
+			dev_crit(
+				&spi->dev,
+				"status %d from spi_sync in write\n",
+				status
+			);
 		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == '\xF0') {
 			/* ca8210 is busy */
 			ca8210_spi_writeDummy(spi);
@@ -1005,23 +1104,47 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		#define NUM_DATABYTES_SO_FAR (len-2)
 		if (priv->cas_ctl.tx_in_buf[1] > NUM_DATABYTES_SO_FAR) {
 			/* Need to read rest of data of packet */
-			/* Buffer what we have so far and set up the rest of the transfer */
-			dev_dbg(&spi->dev, "READ CMDID & LEN DURING TX, NEED TO READ REST OF DATA\n");
-			memcpy(priv->cas_ctl.rx_final_buf, &priv->cas_ctl.tx_in_buf[0], 2);
-			memcpy(priv->cas_ctl.rx_buf, &priv->cas_ctl.tx_in_buf[2], NUM_DATABYTES_SO_FAR);
-			priv->cas_ctl.rx_transfer.len = priv->cas_ctl.tx_in_buf[1] - NUM_DATABYTES_SO_FAR;
-			priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf + NUM_DATABYTES_SO_FAR;
-			priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
-			priv->cas_ctl.rx_transfer.cs_change = 0; /* de-assert CS */
+			/* Buffer what we have so far and set up the rest of the
+			 * transfer */
+			dev_dbg(
+				&spi->dev,
+				"READ CMDID & LEN DURING TX, " \
+				"NEED TO READ REST OF DATA\n");
+			memcpy(
+				priv->cas_ctl.rx_final_buf,
+				&priv->cas_ctl.tx_in_buf[0],
+				2
+			);
+			memcpy(
+				priv->cas_ctl.rx_buf,
+				&priv->cas_ctl.tx_in_buf[2],
+				NUM_DATABYTES_SO_FAR
+			);
+			priv->cas_ctl.rx_transfer.len = \
+				priv->cas_ctl.tx_in_buf[1] - \
+					NUM_DATABYTES_SO_FAR;
+			priv->cas_ctl.rx_transfer.rx_buf = \
+				priv->cas_ctl.rx_buf + NUM_DATABYTES_SO_FAR;
+			priv->cas_ctl.rx_transfer.tx_buf = \
+				priv->cas_ctl.rx_out_buf;
+			/* de-assert CS */
+			priv->cas_ctl.rx_transfer.cs_change = 0;
 			spi_message_init(&priv->cas_ctl.rx_msg);
 			priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
 			/* Pass the spi reference to the complete */
 			priv->cas_ctl.rx_msg.context = spi;
-			spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
+			spi_message_add_tail(
+				&priv->cas_ctl.rx_transfer,
+				&priv->cas_ctl.rx_msg
+			);
 			status = spi_async(spi, &priv->cas_ctl.rx_msg);
 
 			if (status) {
-				dev_crit(&spi->dev, "status %d from spi_async in write\n", status);
+				dev_crit(
+					&spi->dev,
+					"status %d from spi_async in write\n",
+					status
+				);
 			}
 			local_irq_restore(flags);
 			return status;
@@ -1029,7 +1152,11 @@ static int ca8210_spi_write(struct spi_device *spi, const uint8_t *buf, size_t l
 		else {
 			dev_dbg(&spi->dev, "READ WHOLE CMD DURING TX\n");
 			/* whole packet read during transfer */
-			memcpy(priv->cas_ctl.rx_final_buf, priv->cas_ctl.tx_in_buf, CA8210_SPI_BUF_SIZE);
+			memcpy(
+				priv->cas_ctl.rx_final_buf,
+				priv->cas_ctl.tx_in_buf,
+				CA8210_SPI_BUF_SIZE
+			);
 			INIT_WORK(&priv->rx_work, ca8210_rx_done);
 			queue_work(priv->rx_workqueue, &priv->rx_work);
 		}
@@ -1067,10 +1194,10 @@ static int ca8210_spi_writeDummy(struct spi_device *spi)
 
 /**
  * ca8210_spi_exchange() - Exchange API/SAP commands with the radio
- * @buf: Octet array of command being sent downstream
- * @len: length of buf
- * @response: buffer for storing synchronous response
- * @device_ref: spi_device pointer for ca8210
+ * @buf:         Octet array of command being sent downstream
+ * @len:         length of buf
+ * @response:    buffer for storing synchronous response
+ * @device_ref:  spi_device pointer for ca8210
  *
  * Effectively calls ca8210_spi_write to write buf[] to the spi, then for
  * synchronous commands waits for the corresponding response to be read from
@@ -1098,7 +1225,7 @@ static int ca8210_spi_exchange(
 		return status;
 	}
 
-	if ((buf[0] & SPI_SYN) && response) { /* if synchronous wait for confirm */
+	if ((buf[0] & SPI_SYN) && response) { /* if sync wait for confirm */
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 			return -ERESTARTSYS;
 		}
@@ -1107,7 +1234,8 @@ static int ca8210_spi_exchange(
 		mutex_unlock(&priv->sync_command_mutex);
 		startjiffies = jiffies;
 		while (1) {
-			if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
+			if (mutex_lock_interruptible(&priv->sync_command_mutex))
+			{
 				return -ERESTARTSYS;
 			}
 			if (!priv->sync_command_pending) {
@@ -1117,8 +1245,12 @@ static int ca8210_spi_exchange(
 			}
 			mutex_unlock(&priv->sync_command_mutex);
 			currentjiffies = jiffies;
-			if ((currentjiffies - startjiffies) > msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
-				dev_err(&spi->dev, "Synchronous confirm timeout\n");
+			if ((currentjiffies - startjiffies) >
+			    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
+				dev_err(
+					&spi->dev,
+					"Synchronous confirm timeout\n"
+				);
 				return -ETIME;
 			}
 		}
@@ -1156,7 +1288,11 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
  */
 static void ca8210_irq_worker(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(work, struct ca8210_priv, irq_work);
+	struct ca8210_priv *priv = container_of(
+		work,
+		struct ca8210_priv,
+		irq_work
+	);
 
 	ca8210_spi_startRead(priv->spi);
 }
@@ -1181,11 +1317,11 @@ static int (*cascoda_api_upstream)(
 /* Cascoda API / 15.4 SAP Primitives */
 
 /**
- * TDME_SETSFR_request_sync() - TDME_SETSFR_request/confirm according to API Spec
+ * TDME_SETSFR_request_sync() - TDME_SETSFR_request/confirm according to API
  * @sfr_page:    SFR Page
  * @sfr_address: SFR Address
  * @sfr_value:   SFR Value
- * @device_ref: Nondescript pointer to target device
+ * @device_ref:  Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of TDME-SETSFR.confirm
  */
@@ -1205,14 +1341,24 @@ static uint8_t TDME_SETSFR_request_sync(
 	command.pdata.tdme_set_sfr_req.sfr_address = sfr_address;
 	command.pdata.tdme_set_sfr_req.sfr_value   = sfr_value;
 	response.command_id = SPI_IDLE;
-	ret = cascoda_api_downstream(&command.command_id, command.length + 2, &response.command_id, device_ref);
+	ret = cascoda_api_downstream(
+		&command.command_id,
+		command.length + 2,
+		&response.command_id,
+		device_ref
+	);
 	if (ret) {
 		dev_crit(&spi->dev, "cascoda_api_downstream returned %d", ret);
 		return MAC_SYSTEM_ERROR;
 	}
 
 	if (response.command_id != SPI_TDME_SETSFR_CONFIRM) {
-		dev_crit(&spi->dev, "sync response to SPI_TDME_SETSFR_REQUEST was not SPI_TDME_SETSFR_CONFIRM, it was %d\n", response.command_id);
+		dev_crit(
+			&spi->dev,
+			"sync response to SPI_TDME_SETSFR_REQUEST was not " \
+			"SPI_TDME_SETSFR_CONFIRM, it was %d\n",
+			response.command_id
+		);
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -1229,28 +1375,50 @@ static uint8_t TDME_ChipInit(void *device_ref)
 {
 	uint8_t status;
 
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX40, 0x29, device_ref)))  /* LNA Gain Settings */
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX41, 0x54, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX42, 0x6C, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX43, 0x7A, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX44, 0x84, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX45, 0x8B, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX46, 0x92, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_LNAGX47, 0x96, device_ref)))
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_PRECFG, 0x5B, device_ref))) /* Preamble Timing Config */
-		return(status);
-	if((status = TDME_SETSFR_request_sync(1, CA8210_SFR_PTHRH, 0x5A, device_ref))) /* Preamble Threshold High */
-		return(status);
-	if((status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFGIB, 0x3F, device_ref))) /* Tx Output Power 8 dBm */
-		return(status);
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX40, 0x29, device_ref))
+	)  /* LNA Gain Settings */
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX41, 0x54, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX42, 0x6C, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX43, 0x7A, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX44, 0x84, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX45, 0x8B, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX46, 0x92, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_LNAGX47, 0x96, device_ref))
+	)
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_PRECFG, 0x5B, device_ref))
+	) /* Preamble Timing Config */
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		1, CA8210_SFR_PTHRH, 0x5A, device_ref))
+	) /* Preamble Threshold High */
+		return status;
+	if ((status = TDME_SETSFR_request_sync(
+		0, CA8210_SFR_PACFGIB, 0x3F, device_ref))
+	) /* Tx Output Power 8 dBm */
+		return status;
 
 	return MAC_SUCCESS;
 }
@@ -1286,16 +1454,21 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
 		txcalval = 0xAF;
 	}
 
-	return TDME_SETSFR_request_sync(1, CA8210_SFR_LOTXCAL, txcalval, device_ref);  /* LO Tx Cal */
+	return TDME_SETSFR_request_sync(
+		1,
+		CA8210_SFR_LOTXCAL,
+		txcalval,
+		device_ref
+	);  /* LO Tx Cal */
 }
 
 /**
  * TDME_CheckPIBAttribute() - Checks Attribute Values that are not checked in
  *                            MAC
- * @pib_attribute:       Attribute Number
+ * @pib_attribute:        Attribute Number
  * @pib_attribute_length: Attribute length
- * @pib_attribute_value: Pointer to Attribute Value
- * @device_ref:         Nondescript pointer to target device
+ * @pib_attribute_value:  Pointer to Attribute Value
+ * @device_ref:           Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of checks
  */
@@ -1415,14 +1588,22 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 
 	if (CA8210_MAC_MPW) {
 		if (txp_val > 0) {
-			paib = 0xD3; /* 8 dBm: ptrim = 5, itrim = +3 => +4 dBm */
+			/* 8 dBm: ptrim = 5, itrim = +3 => +4 dBm */
+			paib = 0xD3;
 		} else {
-			paib = 0x73; /* 0 dBm: ptrim = 7, itrim = +3 => -6 dBm */
+			/* 0 dBm: ptrim = 7, itrim = +3 => -6 dBm */
+			paib = 0x73;
 		}
 		/* write PACFG */
-		status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFG, paib, device_ref);
+		status = TDME_SETSFR_request_sync(
+			0,
+			CA8210_SFR_PACFG,
+			paib,
+			device_ref
+		);
 	} else {
-		/* Look-Up Table for Setting Current and Frequency Trim values for desired Output Power */
+		/* Look-Up Table for Setting Current and Frequency Trim values
+		 * for desired Output Power */
 		if (       txp_val  >  8) {
 			paib = 0x3F;
 		} else if (txp_val ==  8) {
@@ -1447,7 +1628,12 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 			paib = 0x00;
 		}
 		/* write PACFGIB */
-		status = TDME_SETSFR_request_sync(0, CA8210_SFR_PACFGIB, paib, device_ref);
+		status = TDME_SETSFR_request_sync(
+			0,
+			CA8210_SFR_PACFGIB,
+			paib,
+			device_ref
+		);
 	}
 
 	return status;
@@ -1455,16 +1641,16 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 
 /**
  * MCPS_DATA_request() - MCPS_DATA_request (Send Data) according to API Spec
- * @src_addr_mode: Source Addressing Mode
+ * @src_addr_mode:    Source Addressing Mode
  * @dst_address_mode: Destination Addressing Mode
- * @dst_pan_id:    Destination PAN ID
- * @dst_addr:    Pointer to Destination Address
- * @msdu_length:  length of Data
- * @msdu:       Pointer to Data
- * @msdu_handle:  Handle of Data
- * @tx_options:   Tx Options Bit Field
- * @security:   Pointer to Security Structure or NULL
- * @device_ref:  Nondescript pointer to target device
+ * @dst_pan_id:       Destination PAN ID
+ * @dst_addr:         Pointer to Destination Address
+ * @msdu_length:      length of Data
+ * @msdu:             Pointer to Data
+ * @msdu_handle:      Handle of Data
+ * @tx_options:       Tx Options Bit Field
+ * @security:         Pointer to Security Structure or NULL
+ * @device_ref:       Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of action
  */
@@ -1491,8 +1677,12 @@ static uint8_t MCPS_DATA_request(
 		DATAREQ.dst.pan_id[0] = LS_BYTE(dst_pan_id);
 		DATAREQ.dst.pan_id[1] = MS_BYTE(dst_pan_id);
 		if (dst_address_mode == MAC_MODE_SHORT_ADDR) {
-			DATAREQ.dst.address[0] = LS_BYTE(dst_addr->short_address);
-			DATAREQ.dst.address[1] = MS_BYTE(dst_addr->short_address);
+			DATAREQ.dst.address[0] = LS_BYTE(
+				dst_addr->short_address
+			);
+			DATAREQ.dst.address[1] = MS_BYTE(
+				dst_addr->short_address
+			);
 		} else {   /* MAC_MODE_LONG_ADDR*/
 			memcpy(DATAREQ.dst.address, dst_addr->ieee_address, 8);
 		}
@@ -1502,7 +1692,8 @@ static uint8_t MCPS_DATA_request(
 	DATAREQ.tx_options = tx_options;
 	memcpy(DATAREQ.msdu, msdu, msdu_length);
 	pSec = (struct secspec*)(DATAREQ.msdu + msdu_length);
-	command.length = sizeof(struct MCPS_DATA_request_pset) - MAX_DATA_SIZE + msdu_length;
+	command.length = sizeof(struct MCPS_DATA_request_pset) - \
+		MAX_DATA_SIZE + msdu_length;
 	if ( (security == NULL) || (security->security_level == 0) ) {
 		pSec->security_level = 0;
 		command.length += 1;
@@ -1511,7 +1702,9 @@ static uint8_t MCPS_DATA_request(
 		command.length += sizeof(struct secspec);
 	}
 
-	if (cascoda_api_downstream(&command.command_id, command.length + 2, NULL, device_ref))
+	if (cascoda_api_downstream(
+		&command.command_id, command.length + 2, NULL, device_ref)
+	)
 		return MAC_SYSTEM_ERROR;
 
 	return MAC_SUCCESS;
@@ -1521,11 +1714,14 @@ static uint8_t MCPS_DATA_request(
 /**
  * MLME_RESET_request_sync() - MLME_RESET_request/confirm according to API Spec
  * @set_default_pib: Set defaults in PIB
- * @device_ref:    Nondescript pointer to target device
+ * @device_ref:      Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of MLME-RESET.confirm
  */
-static uint8_t MLME_RESET_request_sync(uint8_t set_default_pib, void *device_ref)
+static uint8_t MLME_RESET_request_sync(
+	uint8_t  set_default_pib,
+	void    *device_ref
+)
 {
 	uint8_t status;
 	struct mac_message command, response;
@@ -1535,8 +1731,14 @@ static uint8_t MLME_RESET_request_sync(uint8_t set_default_pib, void *device_ref
 	command.length = 1;
 	SIMPLEREQ.u8param = set_default_pib;
 
-	if (cascoda_api_downstream(&command.command_id, command.length + 2, &response.command_id, device_ref))
+	if (cascoda_api_downstream(
+		&command.command_id,
+		command.length + 2,
+		&response.command_id,
+		device_ref))
+	{
 		return MAC_SYSTEM_ERROR;
+	}
 
 	if (response.command_id != SPI_MLME_RESET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
@@ -1544,8 +1746,14 @@ static uint8_t MLME_RESET_request_sync(uint8_t set_default_pib, void *device_ref
 	status = SIMPLECNF.status;
 
 	/* reset COORD Bit for Channel Filtering as Coordinator */
-	if (CA8210_MAC_WORKAROUNDS && set_default_pib && (!status))
-		status = TDME_SETSFR_request_sync(0, CA8210_SFR_MACCON, 0, device_ref);
+	if (CA8210_MAC_WORKAROUNDS && set_default_pib && (!status)) {
+		status = TDME_SETSFR_request_sync(
+			0,
+			CA8210_SFR_MACCON,
+			0,
+			device_ref
+		);
+	}
 
 	return status;
 	#undef SIMPLEREQ
@@ -1554,11 +1762,11 @@ static uint8_t MLME_RESET_request_sync(uint8_t set_default_pib, void *device_ref
 
 /**
  * MLME_SET_request_sync() - MLME_SET_request/confirm according to API Spec
- * @pib_attribute:       Attribute Number
+ * @pib_attribute:        Attribute Number
  * @pib_attribute_index:  Index within Attribute if an Array
  * @pib_attribute_length: Attribute length
- * @pib_attribute_value: Pointer to Attribute Value
- * @device_ref:         Nondescript pointer to target device
+ * @pib_attribute_value:  Pointer to Attribute Value
+ * @device_ref:           Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of MLME-SET.confirm
  */
@@ -1574,29 +1782,51 @@ static uint8_t MLME_SET_request_sync(
 	struct mac_message command, response;
 	#define SETREQ    (command.pdata.set_req)
 	#define SIMPLECNF (response.pdata)
-	/* pre-check the validity of pib_attribute values that are not checked in MAC */
-	if (TDME_CheckPIBAttribute(pib_attribute, pib_attribute_length, pib_attribute_value))
+	/* pre-check the validity of pib_attribute values that are not checked
+	 * in MAC */
+	if (TDME_CheckPIBAttribute(
+		pib_attribute, pib_attribute_length, pib_attribute_value))
+	{
 		return MAC_INVALID_PARAMETER;
+	}
 
 	if (pib_attribute == PHY_CURRENT_CHANNEL) {
-		status = TDME_ChannelInit(*((uint8_t*)pib_attribute_value), device_ref);
+		status = TDME_ChannelInit(
+			*((uint8_t*)pib_attribute_value),
+			device_ref
+		);
 		if (status) {
 			return status;
 		}
 	}
 
-	if (pib_attribute == PHY_TRANSMIT_POWER)
-		return(TDME_SetTxPower(*((uint8_t*)pib_attribute_value), device_ref));
+	if (pib_attribute == PHY_TRANSMIT_POWER) {
+		return TDME_SetTxPower(
+			*((uint8_t*)pib_attribute_value),
+			device_ref
+		);
+	}
 
 	command.command_id = SPI_MLME_SET_REQUEST;
-	command.length = sizeof(struct MLME_SET_request_pset) - MAX_ATTRIBUTE_SIZE + pib_attribute_length;
+	command.length = sizeof(struct MLME_SET_request_pset) - \
+		MAX_ATTRIBUTE_SIZE + pib_attribute_length;
 	SETREQ.pib_attribute = pib_attribute;
 	SETREQ.pib_attribute_index = pib_attribute_index;
 	SETREQ.pib_attribute_length = pib_attribute_length;
-	memcpy( SETREQ.pib_attribute_value, pib_attribute_value, pib_attribute_length );
+	memcpy(
+		SETREQ.pib_attribute_value,
+		pib_attribute_value,
+		pib_attribute_length
+	);
 
-	if (cascoda_api_downstream(&command.command_id, command.length + 2, &response.command_id, device_ref))
+	if (cascoda_api_downstream(
+		&command.command_id,
+		command.length + 2,
+		&response.command_id,
+		device_ref))
+	{
 		return MAC_SYSTEM_ERROR;
+	}
 
 	if (response.command_id != SPI_MLME_SET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
@@ -1608,10 +1838,10 @@ static uint8_t MLME_SET_request_sync(
 
 /**
  * HWME_SET_request_sync() - HWME_SET_request/confirm according to API Spec
- * @hw_attribute:       Attribute Number
+ * @hw_attribute:        Attribute Number
  * @hw_attribute_length: Attribute length
- * @hw_attribute_value: Pointer to Attribute Value
- * @device_ref:        Nondescript pointer to target device
+ * @hw_attribute_value:  Pointer to Attribute Value
+ * @device_ref:          Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of HWME-SET.confirm
  */
@@ -1627,10 +1857,20 @@ static uint8_t HWME_SET_request_sync(
 	command.length = 2 + hw_attribute_length;
 	command.pdata.hwme_set_req.hw_attribute = hw_attribute;
 	command.pdata.hwme_set_req.hw_attribute_length = hw_attribute_length;
-	memcpy(command.pdata.hwme_set_req.hw_attribute_value, hw_attribute_value, hw_attribute_length);
+	memcpy(
+		command.pdata.hwme_set_req.hw_attribute_value,
+		hw_attribute_value,
+		hw_attribute_length
+	);
 
-	if (cascoda_api_downstream(&command.command_id, command.length + 2, &response.command_id, device_ref))
+	if (cascoda_api_downstream(
+		&command.command_id,
+		command.length + 2,
+		&response.command_id,
+		device_ref))
+	{
 		return MAC_SYSTEM_ERROR;
+	}
 
 	if (response.command_id != SPI_HWME_SET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
@@ -1640,10 +1880,10 @@ static uint8_t HWME_SET_request_sync(
 
 /**
  * HWME_GET_request_sync() - HWME_GET_request/confirm according to API Spec
- * @hw_attribute:       Attribute Number
+ * @hw_attribute:        Attribute Number
  * @hw_attribute_length: Attribute length
- * @hw_attribute_value: Pointer to Attribute Value
- * @device_ref:        Nondescript pointer to target device
+ * @hw_attribute_value:  Pointer to Attribute Value
+ * @device_ref:          Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of HWME-GET.confirm
  */
@@ -1659,15 +1899,26 @@ static uint8_t HWME_GET_request_sync(
 	command.length = 1;
 	command.pdata.hwme_get_req.hw_attribute = hw_attribute;
 
-	if (cascoda_api_downstream(&command.command_id, command.length + 2, &response.command_id, device_ref))
+	if (cascoda_api_downstream(
+		&command.command_id,
+		command.length + 2,
+		&response.command_id,
+		device_ref))
+	{
 		return MAC_SYSTEM_ERROR;
+	}
 
 	if (response.command_id != SPI_HWME_GET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
 
 	if (response.pdata.hwme_get_cnf.status == MAC_SUCCESS) {
-		*hw_attribute_length = response.pdata.hwme_get_cnf.hw_attribute_length;
-		memcpy(hw_attribute_value, response.pdata.hwme_get_cnf.hw_attribute_value, *hw_attribute_length);
+		*hw_attribute_length = \
+			response.pdata.hwme_get_cnf.hw_attribute_length;
+		memcpy(
+			hw_attribute_value,
+			response.pdata.hwme_get_cnf.hw_attribute_value,
+			*hw_attribute_length
+		);
 	}
 
 	return response.pdata.hwme_get_cnf.status;
@@ -1685,30 +1936,45 @@ static uint8_t HWME_GET_request_sync(
  *
  * Return: 0 or linux error code
  */
-static int ca8210_async_xmit_complete(struct ieee802154_hw *hw, uint8_t msduhandle, uint8_t status)
+static int ca8210_async_xmit_complete(
+	struct ieee802154_hw  *hw,
+	uint8_t                msduhandle,
+	uint8_t                status)
 {
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
 	if (status) {
-		dev_err(&priv->spi->dev, "Link transmission unsuccessful, status = %d\n", status);
+		dev_err(
+			&priv->spi->dev,
+			"Link transmission unsuccessful, status = %d\n",
+			status
+		);
 		if (status == 0xF1) {
 			MLME_RESET_request_sync(0, priv->spi);
 		}
 	}
 
 	if (priv->nextmsduhandle != msduhandle) {
-		dev_crit(&priv->spi->dev, "Unexpected msdu_handle on data confirm, Expected %d, got %d\n",
+		dev_crit(
+			&priv->spi->dev,
+			"Unexpected msdu_handle on data confirm, " \
+			"Expected %d, got %d\n",
 			priv->nextmsduhandle,
-			msduhandle);
+			msduhandle
+		);
 		priv->nextmsduhandle = 0;
 		return -EIO;
 	}
 
 	/* stop timeout work */
 	if (!cancel_delayed_work_sync(&priv->async_tx_timeout_work)) {
-		dev_err(&priv->spi->dev, "async tx timeout wasn't pending when transfer complete\n");
+		dev_err(
+			&priv->spi->dev,
+			"async tx timeout wasn't pending when transfer " \
+			"complete\n"
+		);
 	}
 
 	dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
@@ -1740,7 +2006,11 @@ static int ca8210_async_xmit_complete(struct ieee802154_hw *hw, uint8_t msduhand
  *
  * Return: 0 or linux error code
  */
-static int ca8210_skb_rx(struct ieee802154_hw *hw, size_t len, uint8_t *data_ind)
+static int ca8210_skb_rx(
+	struct ieee802154_hw  *hw,
+	size_t                 len,
+	uint8_t               *data_ind
+)
 {
 	struct ieee802154_hdr hdr;
 	int msdulen;
@@ -1834,14 +2104,30 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 
 	if (command[0] == SPI_MCPS_DATA_INDICATION) {
 		/* Received data */
-		dev_dbg(&priv->spi->dev, "Trying to get spinlock on CPU%d\n", cpu);
+		dev_dbg(
+			&priv->spi->dev,
+			"Trying to get spinlock on CPU%d\n",
+			cpu
+		);
 		spin_lock_irqsave(&priv->lock, flags);
 		dev_dbg(&priv->spi->dev, "Got spinlock on CPU%d\n", cpu);
 		if (command[26] == priv->last_dsn) {
-			dev_dbg(&priv->spi->dev, "DSN %d resend received, ignoring...\n", command[26]);
-			dev_dbg(&priv->spi->dev, "Releasing spinlock on CPU%d\n", cpu);
+			dev_dbg(
+				&priv->spi->dev,
+				"DSN %d resend received, ignoring...\n",
+				command[26]
+			);
+			dev_dbg(
+				&priv->spi->dev,
+				"Releasing spinlock on CPU%d\n",
+				cpu
+			);
 			spin_unlock_irqrestore(&priv->lock, flags);
-			dev_dbg(&priv->spi->dev, "Released spinlock on CPU%d\n", cpu);
+			dev_dbg(
+				&priv->spi->dev,
+				"Released spinlock on CPU%d\n",
+				cpu
+			);
 			return 0;
 		}
 		priv->last_dsn = command[26];
@@ -1851,7 +2137,11 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 		return ca8210_skb_rx(hw, len-2, command+2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
 		if (priv->async_tx_pending) {
-			return ca8210_async_xmit_complete(hw, command[2], command[3]);
+			return ca8210_async_xmit_complete(
+				hw,
+				command[2],
+				command[3]
+			);
 		} else if (priv->sync_tx_pending) {
 			priv->sync_tx_pending = false;
 		}
@@ -1868,7 +2158,11 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_skb_tx(struct sk_buff *skb, uint8_t msduhandle, struct ca8210_priv *priv)
+static int ca8210_skb_tx(
+	struct sk_buff      *skb,
+	uint8_t              msduhandle,
+	struct ca8210_priv  *priv
+)
 {
 	int status;
 	struct ieee802154_hdr header = { 0 };
@@ -1876,7 +2170,8 @@ static int ca8210_skb_tx(struct sk_buff *skb, uint8_t msduhandle, struct ca8210_
 
 	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
 
-	/* Get addressing info from skb - ieee802154 layer creates a full packet*/
+	/* Get addressing info from skb - ieee802154 layer creates a full
+	 * packet*/
 	ieee802154_hdr_peek_addrs(skb, &header);
 
 	secspec.security_level = header.sec.level;
@@ -1908,7 +2203,11 @@ static int ca8210_skb_tx(struct sk_buff *skb, uint8_t msduhandle, struct ca8210_
  */
 static void ca8210_async_tx_worker(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(work, struct ca8210_priv, async_tx_work);
+	struct ca8210_priv *priv = container_of(
+		work,
+		struct ca8210_priv,
+		async_tx_work
+	);
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
@@ -1940,8 +2239,16 @@ static void ca8210_async_tx_worker(struct work_struct *work)
  */
 static void ca8210_async_tx_timeout_worker(struct work_struct *work)
 {
-	struct delayed_work *del_work = container_of(work, struct delayed_work, work);
-	struct ca8210_priv *priv = container_of(del_work, struct ca8210_priv, async_tx_timeout_work);
+	struct delayed_work *del_work = container_of(
+		work,
+		struct delayed_work,
+		work
+	);
+	struct ca8210_priv *priv = container_of(
+		del_work,
+		struct ca8210_priv,
+		async_tx_timeout_work
+	);
 	unsigned long flags;
 	unsigned cpu = smp_processor_id();
 
@@ -1972,20 +2279,36 @@ static int ca8210_start(struct ieee802154_hw *hw)
 	uint8_t rx_on_when_idle;
 	struct ca8210_priv *priv = hw->priv;
 
-	priv->async_tx_workqueue = alloc_ordered_workqueue("ca8210 tx worker", 0);
+	priv->async_tx_workqueue = alloc_ordered_workqueue(
+		"ca8210 tx worker",
+		0
+	);
 	if (priv->async_tx_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc_ordered_workqueue failed\n");
 		return -ENOMEM;
 	}
 	INIT_WORK(&priv->async_tx_work, ca8210_async_tx_worker);
-	INIT_DELAYED_WORK(&priv->async_tx_timeout_work, ca8210_async_tx_timeout_worker);
+	INIT_DELAYED_WORK(
+		&priv->async_tx_timeout_work,
+		ca8210_async_tx_timeout_worker
+	);
 
 	priv->last_dsn = -1;
 	/* Turn receiver on when idle for now just to test rx */
 	rx_on_when_idle = 1;
-	status = MLME_SET_request_sync(MAC_RX_ON_WHEN_IDLE, 0, 1, &rx_on_when_idle, priv->spi);
+	status = MLME_SET_request_sync(
+		MAC_RX_ON_WHEN_IDLE,
+		0,
+		1,
+		&rx_on_when_idle,
+		priv->spi
+	);
 	if (status) {
-		dev_crit(&priv->spi->dev, "Setting rx_on_when_idle failed, status = %d\n", status);
+		dev_crit(
+			&priv->spi->dev,
+			"Setting rx_on_when_idle failed, status = %d\n",
+			status
+		);
 		return link_to_linux_err(status);
 	}
 
@@ -2063,7 +2386,7 @@ static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
 /**
  * ca8210_get_ed() - Returns the measured energy on the current channel at this
  *                   instant in time
- * @hw:  ieee802154_hw of target ca8210
+ * @hw:     ieee802154_hw of target ca8210
  * @level:  Measured Energy Detect level
  *
  * Return: 0 or linux error code
@@ -2080,19 +2403,33 @@ static int ca8210_get_ed(struct ieee802154_hw *hw, uint8_t *level)
 /**
  * ca8210_set_channel() - Sets the current operating 802.15.4 channel of the
  *                        ca8210
- * @hw:  ieee802154_hw of target ca8210
+ * @hw:       ieee802154_hw of target ca8210
  * @page:     Channel page to set
  * @channel:  Channel number to set
  *
  * Return: 0 or linux error code
  */
-static int ca8210_set_channel(struct ieee802154_hw *hw, uint8_t page, uint8_t channel)
+static int ca8210_set_channel(
+	struct ieee802154_hw  *hw,
+	uint8_t                page,
+	uint8_t                channel
+)
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
-	status = MLME_SET_request_sync(PHY_CURRENT_CHANNEL, 0, 1, &channel, priv->spi);
+	status = MLME_SET_request_sync(
+		PHY_CURRENT_CHANNEL,
+		0,
+		1,
+		&channel,
+		priv->spi
+	);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting channel, MLME-SET.confirm status = %d\n", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting channel, MLME-SET.confirm status = %d\n",
+			status
+		);
 	}
 	return link_to_linux_err(status);
 }
@@ -2110,31 +2447,64 @@ static int ca8210_set_channel(struct ieee802154_hw *hw, uint8_t page, uint8_t ch
  *
  * Return: 0 or linux error code
  */
-static int ca8210_set_hw_addr_filt(struct ieee802154_hw *hw,
-                                   struct ieee802154_hw_addr_filt *filt,
-                                   unsigned long changed)
+static int ca8210_set_hw_addr_filt(
+	struct ieee802154_hw            *hw,
+	struct ieee802154_hw_addr_filt  *filt,
+	unsigned long                    changed
+)
 {
 	uint8_t status = 0;
 	struct ca8210_priv *priv = hw->priv;
 
 	if (changed&IEEE802154_AFILT_PANID_CHANGED) {
-		status = MLME_SET_request_sync(MAC_PAN_ID, 0, 2, &filt->pan_id, priv->spi);
+		status = MLME_SET_request_sync(
+			MAC_PAN_ID,
+			0,
+			2,
+			&filt->pan_id, priv->spi
+		);
 		if (status) {
-			dev_err(&priv->spi->dev, "problem setting pan id, MLME-SET.confirm status = %d", status);
+			dev_err(
+				&priv->spi->dev,
+				"error setting pan id, " \
+				"MLME-SET.confirm status = %d",
+				status
+			);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_SADDR_CHANGED) {
-		status = MLME_SET_request_sync(MAC_SHORT_ADDRESS, 0, 2, &filt->short_addr, priv->spi);
+		status = MLME_SET_request_sync(
+			MAC_SHORT_ADDRESS,
+			0,
+			2,
+			&filt->short_addr, priv->spi
+		);
 		if (status) {
-			dev_err(&priv->spi->dev, "problem setting short address, MLME-SET.confirm status = %d", status);
+			dev_err(
+				&priv->spi->dev,
+				"error setting short address, " \
+				"MLME-SET.confirm status = %d",
+				status
+			);
 			return link_to_linux_err(status);
 		}
 	}
 	if (changed&IEEE802154_AFILT_IEEEADDR_CHANGED) {
-		status = MLME_SET_request_sync(NS_IEEE_ADDRESS, 0, 8, &filt->ieee_addr, priv->spi);
+		status = MLME_SET_request_sync(
+			NS_IEEE_ADDRESS,
+			0,
+			8,
+			&filt->ieee_addr,
+			priv->spi
+		);
 		if (status) {
-			dev_err(&priv->spi->dev, "problem setting ieee address, MLME-SET.confirm status = %d", status);
+			dev_err(
+				&priv->spi->dev,
+				"error setting ieee address, " \
+				"MLME-SET.confirm status = %d",
+				status
+			);
 			return link_to_linux_err(status);
 		}
 	}
@@ -2164,7 +2534,10 @@ static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_set_cca_mode(struct ieee802154_hw *hw, const struct wpan_phy_cca *cca)
+static int ca8210_set_cca_mode(
+	struct ieee802154_hw       *hw,
+	const struct wpan_phy_cca  *cca
+)
 {
 	uint8_t status;
 	uint8_t cca_mode;
@@ -2174,9 +2547,20 @@ static int ca8210_set_cca_mode(struct ieee802154_hw *hw, const struct wpan_phy_c
 		/* cca_mode 0 == CS OR ED, 3 == CS AND ED */
 		cca_mode = 0;
 	}
-	status = MLME_SET_request_sync(PHY_CCA_MODE, 0, 1, &cca_mode, priv->spi);
+	status = MLME_SET_request_sync(
+		PHY_CCA_MODE,
+		0,
+		1,
+		&cca_mode,
+		priv->spi
+	);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting cca mode, MLME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting cca mode, " \
+			"MLME-SET.confirm status = %d",
+			status
+		);
 	}
 	return link_to_linux_err(status);
 }
@@ -2196,9 +2580,19 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, int32_t level)
 	uint8_t status;
 	uint8_t ed_threshold = level * 2 + 256;
 	struct ca8210_priv *priv = hw->priv;
-	status = HWME_SET_request_sync(HWME_EDTHRESHOLD, 1, &ed_threshold, priv->spi);
+	status = HWME_SET_request_sync(
+		HWME_EDTHRESHOLD,
+		1,
+		&ed_threshold,
+		priv->spi
+	);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting ed threshold, HWME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting ed threshold, " \
+			"HWME-SET.confirm status = %d",
+			status
+		);
 	}
 	return link_to_linux_err(status);
 }
@@ -2212,23 +2606,47 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, int32_t level)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_set_csma_params(struct ieee802154_hw *hw, uint8_t min_be, uint8_t max_be, uint8_t retries)
+static int ca8210_set_csma_params(
+	struct ieee802154_hw  *hw,
+	uint8_t                min_be,
+	uint8_t                max_be,
+	uint8_t                retries
+)
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
 	status = MLME_SET_request_sync(MAC_MIN_BE, 0, 1, &min_be, priv->spi);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting min be, MLME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting min be, MLME-SET.confirm status = %d",
+			status
+		);
 		return link_to_linux_err(status);
 	}
 	status = MLME_SET_request_sync(MAC_MAX_BE, 0, 1, &max_be, priv->spi);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting max be, MLME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting max be, MLME-SET.confirm status = %d",
+			status
+		);
 		return link_to_linux_err(status);
 	}
-	status = MLME_SET_request_sync(MAC_MAX_CSMA_BACKOFFS, 0, 1, &retries, priv->spi);
+	status = MLME_SET_request_sync(
+		MAC_MAX_CSMA_BACKOFFS,
+		0,
+		1,
+		&retries,
+		priv->spi
+	);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting max csma backoffs, MLME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting max csma backoffs, " \
+			"MLME-SET.confirm status = %d",
+			status
+		);
 	}
 	return link_to_linux_err(status);
 }
@@ -2247,9 +2665,19 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
-	status = MLME_SET_request_sync(MAC_MAX_FRAME_RETRIES, 0, 1, &retries, priv->spi);
+	status = MLME_SET_request_sync(
+		MAC_MAX_FRAME_RETRIES,
+		0,
+		1,
+		&retries,
+		priv->spi
+	);
 	if (status) {
-		dev_err(&priv->spi->dev, "problem setting panid, MLME-SET.confirm status = %d", status);
+		dev_err(
+			&priv->spi->dev,
+			"error setting panid, MLME-SET.confirm status = %d",
+			status
+		);
 	}
 	return link_to_linux_err(status);
 }
@@ -2290,7 +2718,7 @@ static int ca8210_test_int_open(struct inode *inodp, struct file *filp)
  * ca8210_test_check_upstream() - Checks a command received from the upstream
  *                                testing interface for required action
  * @buf:        Buffer containing command to check
- * @device_ref:
+ * @device_ref: Nondescript pointer to target device
  *
  * Return: 0 or linux error code
  */
@@ -2314,13 +2742,21 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 		return TDME_ChannelInit(buf[2], device_ref);
 	} else if ( buf[0] == SPI_MLME_START_REQUEST) {
 		return TDME_ChannelInit(buf[4], device_ref);
-	} else if ((buf[0] == SPI_MLME_SET_REQUEST) && (buf[2] == PHY_CURRENT_CHANNEL)) {
+	} else if ((buf[0] == SPI_MLME_SET_REQUEST) &&
+	           (buf[2] == PHY_CURRENT_CHANNEL)) {
 		return TDME_ChannelInit(buf[5], device_ref);
-	} else if ((buf[0] == SPI_TDME_SET_REQUEST) && (buf[2] == TDME_CHANNEL)) {
+	} else if ((buf[0] == SPI_TDME_SET_REQUEST) &&
+	           (buf[2] == TDME_CHANNEL)) {
 		return TDME_ChannelInit(buf[4], device_ref);
-	} else if ((CA8210_MAC_WORKAROUNDS) && (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
+	} else if ((CA8210_MAC_WORKAROUNDS) &&
+	           (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
 		/* reset COORD Bit for Channel Filtering as Coordinator */
-		return TDME_SETSFR_request_sync(0, CA8210_SFR_MACCON, 0, device_ref);
+		return TDME_SETSFR_request_sync(
+			0,
+			CA8210_SFR_MACCON,
+			0,
+			device_ref
+		);
 	}
 	return 0;
 } /* End of EVBMECheckSerialCommand() */
@@ -2335,7 +2771,12 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
  *
  * Return: 0 or linux error code
  */
-static ssize_t ca8210_test_int_user_write(struct file *filp, const char *in_buf, size_t len, loff_t *off)
+static ssize_t ca8210_test_int_user_write(
+	struct file  *filp,
+	const char   *in_buf,
+	size_t        len,
+	loff_t       *off
+)
 {
 	int ret;
 	struct ca8210_priv *priv = filp->private_data;
@@ -2362,7 +2803,12 @@ static ssize_t ca8210_test_int_user_write(struct file *filp, const char *in_buf,
  *
  * Return: 0 or linux error code
  */
-static ssize_t ca8210_test_int_user_read(struct file *filp, char __user *buf, size_t len, loff_t *offp)
+static ssize_t ca8210_test_int_user_read(
+	struct file  *filp,
+	char __user  *buf,
+	size_t        len,
+	loff_t       *offp
+)
 {
 	int i, cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
@@ -2372,7 +2818,11 @@ static ssize_t ca8210_test_int_user_read(struct file *filp, char __user *buf, si
 		return 0;
 
 	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, 4) != 4) {
-		dev_err(&priv->spi->dev, "test_interface: Wrong number of elements popped from upstream fifo\n");
+		dev_err(
+			&priv->spi->dev,
+			"test_interface: Wrong number of elements popped " \
+			"from upstream fifo\n"
+		);
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
@@ -2516,7 +2966,10 @@ static int ca8210_register_ext_clock(struct spi_device *spi)
 	ret = of_clk_add_provider(np, of_clk_src_simple_get, priv->clk);
 	if (ret) {
 		clk_unregister(priv->clk);
-		dev_crit(&spi->dev, "Failed to register external clock as clock provider\n");
+		dev_crit(
+			&spi->dev,
+			"Failed to register external clock as clock provider\n"
+		);
 	} else {
 		dev_info(&spi->dev, "External clock set as clock provider\n");
 	}
@@ -2558,7 +3011,9 @@ static int ca8210_reset_init(struct spi_device *spi)
 
 	ret = gpio_direction_output(pdata->gpio_reset, 1);
 	if (ret < 0) {
-		dev_crit(&spi->dev, "Reset GPIO %d did not set to output mode\n",
+		dev_crit(
+			&spi->dev,
+			"Reset GPIO %d did not set to output mode\n",
 			pdata->gpio_reset);
 	}
 
@@ -2614,35 +3069,50 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 
 	sema_init (&priv->cas_ctl.spi_sem, 1);
 
-	priv->cas_ctl.tx_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.tx_buf = kmalloc(
+		CA8210_SPI_BUF_SIZE,
+		GFP_DMA | GFP_KERNEL
+	);
 	if (priv->cas_ctl.tx_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
 	memset(priv->cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.tx_in_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.tx_in_buf = kmalloc(
+		CA8210_SPI_BUF_SIZE,
+		GFP_DMA | GFP_KERNEL
+	);
 	if (priv->cas_ctl.tx_in_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
 	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_buf = kmalloc(CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_buf = kmalloc(
+		CA8210_SPI_BUF_SIZE,
+		GFP_DMA | GFP_KERNEL
+	);
 	if (priv->cas_ctl.rx_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
 	memset(priv->cas_ctl.rx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_out_buf = kmalloc (CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_out_buf = kmalloc(
+		CA8210_SPI_BUF_SIZE,
+		GFP_DMA | GFP_KERNEL
+	);
 	if (priv->cas_ctl.rx_out_buf == NULL) {
 		status = -EFAULT;
 		goto error;
 	}
 	memset(priv->cas_ctl.rx_out_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_final_buf = kmalloc (CA8210_SPI_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	priv->cas_ctl.rx_final_buf = kmalloc(
+		CA8210_SPI_BUF_SIZE,
+		GFP_DMA | GFP_KERNEL
+	);
 	if (priv->cas_ctl.rx_final_buf == NULL) {
 		status = -EFAULT;
 		goto error;
@@ -2853,7 +3323,10 @@ static int ca8210_remove(struct spi_device *spi_device)
 			}
 			ieee802154_free_hw(priv->hw);
 			priv->hw = NULL;
-			dev_info(&spi_device->dev, "Unregistered & freed ieee802154_hw.\n");
+			dev_info(
+				&spi_device->dev,
+				"Unregistered & freed ieee802154_hw.\n"
+			);
 		}
 		ca8210_test_interface_clear(priv);
 	}
@@ -2901,7 +3374,10 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	pdata = kmalloc(sizeof(struct ca8210_platform_data), GFP_KERNEL);
 	if (pdata == NULL) {
-		dev_crit(&spi_device->dev, "Could not allocate platform data\n");
+		dev_crit(
+			&spi_device->dev,
+			"Could not allocate platform data\n"
+		);
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -2941,12 +3417,18 @@ static int ca8210_probe(struct spi_device *spi_device)
 	if (pdata->extclockenable) {
 		ret = ca8210_config_extern_clk(pdata, priv->spi, 1);
 		if (ret) {
-			dev_crit(&spi_device->dev, "ca8210_config_extern_clk failed\n");
+			dev_crit(
+				&spi_device->dev,
+				"ca8210_config_extern_clk failed\n"
+			);
 			goto error;
 		}
 		ret = ca8210_register_ext_clock(priv->spi);
 		if (ret) {
-			dev_crit(&spi_device->dev, "ca8210_register_ext_clock failed\n");
+			dev_crit(
+				&spi_device->dev,
+				"ca8210_register_ext_clock failed\n"
+			);
 			goto error;
 		}
 	}
