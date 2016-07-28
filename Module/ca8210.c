@@ -342,6 +342,7 @@ struct ca8210_test {
  * struct ca8210_priv - ca8210 private data structure
  * @spi:                    pointer to the ca8210 spi device object
  * @hw:                     pointer to the ca8210 ieee802154_hw object
+ * @hw_registered:          true if hw has been registered with ieee802154
  * @lock:                   spinlock protecting the private data area
  * @async_tx_workqueue:     workqueue for asynchronous transmission
  * @rx_workqueue:           workqueue for receive processing
@@ -360,8 +361,13 @@ struct ca8210_test {
  * @test:                   test interface data section for this instance
  * @async_tx_pending:       true if an asynchronous transmission was started and
  *                          is not complete
- * @sync_tx_pending:        true if a synchronous transmission was started and
- *                          is not complete
+ * @sync_tx_pending:        true if a synchronous (from driver perspective)
+ *                          transmission was started and is not complete
+ * @sync_command_pending:   true if waiting for a synchronous (Cascoda API)
+ *                          response
+ * @sync_command_mutex:     mutex controlling access to sync command objects
+ * @sync_command_response:  pointer to buffer to fill with sync response
+ * @ca8210_is_awake:        true if ca8210 is initialised, ready for comms
  *
  */
 struct ca8210_priv {
