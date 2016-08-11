@@ -2116,12 +2116,13 @@ static int ca8210_skb_tx(
 	int status;
 	struct ieee802154_hdr header = { 0 };
 	struct secspec secspec;
+	unsigned int mac_len;
 
 	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
 
 	/* Get addressing info from skb - ieee802154 layer creates a full
 	 * packet*/
-	ieee802154_hdr_peek_addrs(skb, &header);
+	mac_len = ieee802154_hdr_peek_addrs(skb, &header);
 
 	secspec.security_level = header.sec.level;
 	secspec.key_id_mode = header.sec.key_id_mode;
@@ -2136,8 +2137,8 @@ static int ca8210_skb_tx(
 	                            header.dest.mode,
 	                            header.dest.pan_id,
 	                            (union macaddr*)&header.dest.extended_addr,
-	                            skb->len - skb->mac_len,
-	                            &skb->data[skb->mac_len],
+	                            skb->len - mac_len,
+	                            &skb->data[mac_len],
 	                            msduhandle,
 	                            header.fc.ack_request,
 	                            &secspec,
