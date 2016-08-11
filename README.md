@@ -27,3 +27,9 @@ sudo modprobe ca8210sm
 
 ---
 Information about the hardware is specified in the Linux device tree. The device tree file will be platform specific but for any tree a section must be added within the section for the relevant spi bus for the ca8210. See Docs/devicetree/ca8210.txt for more info.
+
+---
+In order to expose the ca8210 debug node the Linux debug file system must be mounted. debugfs can be mounted with the command:
+```
+mount -t debugfs none /sys/kernel/debug
+```
