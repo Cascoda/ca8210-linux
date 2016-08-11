@@ -1195,6 +1195,7 @@ static int ca8210_spi_exchange(
 	} while (status == -EBUSY);
 
 	if (status < 0) {
+		dev_err(&spi->dev, "spi write failed!\n");
 		return status;
 	}
 
@@ -1698,6 +1699,7 @@ static uint8_t MLME_RESET_request_sync(
 {
 	uint8_t status;
 	struct mac_message command, response;
+	struct spi_device *spi = device_ref;
 	#define SIMPLEREQ (command.pdata)
 	#define SIMPLECNF (response.pdata)
 	command.command_id = SPI_MLME_RESET_REQUEST;
@@ -1710,6 +1712,7 @@ static uint8_t MLME_RESET_request_sync(
 		&response.command_id,
 		device_ref))
 	{
+		dev_err(&spi->dev, "cascoda_api_downstream failed\n");
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -2116,12 +2119,13 @@ static int ca8210_skb_tx(
 	int status;
 	struct ieee802154_hdr header = { 0 };
 	struct secspec secspec;
+	unsigned int mac_len;
 
 	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
 
 	/* Get addressing info from skb - ieee802154 layer creates a full
 	 * packet*/
-	ieee802154_hdr_peek_addrs(skb, &header);
+	mac_len = ieee802154_hdr_peek_addrs(skb, &header);
 
 	secspec.security_level = header.sec.level;
 	secspec.key_id_mode = header.sec.key_id_mode;
@@ -2136,8 +2140,8 @@ static int ca8210_skb_tx(
 	                            header.dest.mode,
 	                            header.dest.pan_id,
 	                            (union macaddr*)&header.dest.extended_addr,
-	                            skb->len - skb->mac_len,
-	                            &skb->data[skb->mac_len],
+	                            skb->len - mac_len,
+	                            &skb->data[mac_len],
 	                            msduhandle,
 	                            header.fc.ack_request,
 	                            &secspec,
@@ -3237,7 +3241,7 @@ static int ca8210_remove(struct spi_device *spi_device)
 	struct ca8210_priv *priv;
 	struct ca8210_platform_data *pdata;
 
-	dev_info(&spi_device->dev, "Removing SPI protocol driver\n");
+	dev_info(&spi_device->dev, "Removing ca8210\n");
 
 	pdata = spi_device->dev.platform_data;
 	if (pdata) {
@@ -3283,7 +3287,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	struct ca8210_platform_data *pdata;
 	int ret;
 
-	dev_info(&spi_device->dev, "Inserting SPI protocol driver\n");
+	dev_info(&spi_device->dev, "Inserting ca8210\n");
 
 	/* allocate ieee802154_hw and private data */
 	hw = ieee802154_alloc_hw(sizeof(struct ca8210_priv), &ca8210_phy_ops);
