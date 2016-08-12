@@ -855,14 +855,14 @@ static void ca8210_spi_continueRead(void *arg)
 		}
 
 		/* Regular data read start */
-		priv->cas_ctl.data_left_to_receive = \
+		priv->cas_ctl.data_left_to_receive =
 			(int) priv->cas_ctl.rx_buf[1];
 		priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
 		priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
 	}
 
 	#define SPLIT_RX_LEN 64
-	priv->cas_ctl.rx_transfer.rx_buf = \
+	priv->cas_ctl.rx_transfer.rx_buf =
 		priv->cas_ctl.rx_buf + priv->cas_ctl.data_received_so_far;
 	if (priv->cas_ctl.data_left_to_receive > SPLIT_RX_LEN) {
 		/* Middle of data */
@@ -876,15 +876,15 @@ static void ca8210_spi_continueRead(void *arg)
 		priv->cas_ctl.data_left_to_receive -= SPLIT_RX_LEN;
 	} else {
 		/* End of data */
-		priv->cas_ctl.rx_transfer.len = \
+		priv->cas_ctl.rx_transfer.len =
 			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_msg.frame_length = \
+		priv->cas_ctl.rx_msg.frame_length =
 			priv->cas_ctl.data_left_to_receive;
 		priv->cas_ctl.rx_transfer.cs_change = 0;
 		priv->cas_ctl.rx_transfer.delay_usecs = 0;
 		priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
 		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far += \
+		priv->cas_ctl.data_received_so_far +=
 			priv->cas_ctl.data_left_to_receive;
 		priv->cas_ctl.data_left_to_receive = 0;
 	}
@@ -1093,12 +1093,12 @@ static int ca8210_spi_write(
 				&priv->cas_ctl.tx_in_buf[2],
 				NUM_DATABYTES_SO_FAR
 			);
-			priv->cas_ctl.rx_transfer.len = \
-				priv->cas_ctl.tx_in_buf[1] - \
+			priv->cas_ctl.rx_transfer.len =
+				priv->cas_ctl.tx_in_buf[1] -
 					NUM_DATABYTES_SO_FAR;
-			priv->cas_ctl.rx_transfer.rx_buf = \
+			priv->cas_ctl.rx_transfer.rx_buf =
 				priv->cas_ctl.rx_buf + NUM_DATABYTES_SO_FAR;
-			priv->cas_ctl.rx_transfer.tx_buf = \
+			priv->cas_ctl.rx_transfer.tx_buf =
 				priv->cas_ctl.rx_out_buf;
 			/* de-assert CS */
 			priv->cas_ctl.rx_transfer.cs_change = 0;
@@ -1667,8 +1667,8 @@ static uint8_t MCPS_DATA_request(
 	DATAREQ.msdu_handle = msdu_handle;
 	DATAREQ.tx_options = tx_options;
 	memcpy(DATAREQ.msdu, msdu, msdu_length);
-	pSec = (struct secspec*)(DATAREQ.msdu + msdu_length);
-	command.length = sizeof(struct MCPS_DATA_request_pset) - \
+	pSec = (struct secspec *)(DATAREQ.msdu + msdu_length);
+	command.length = sizeof(struct MCPS_DATA_request_pset) -
 		MAX_DATA_SIZE + msdu_length;
 	if ( (security == NULL) || (security->security_level == 0) ) {
 		pSec->security_level = 0;
@@ -1786,7 +1786,7 @@ static uint8_t MLME_SET_request_sync(
 	}
 
 	command.command_id = SPI_MLME_SET_REQUEST;
-	command.length = sizeof(struct MLME_SET_request_pset) - \
+	command.length = sizeof(struct MLME_SET_request_pset) -
 		MAX_ATTRIBUTE_SIZE + pib_attribute_length;
 	SETREQ.pib_attribute = pib_attribute;
 	SETREQ.pib_attribute_index = pib_attribute_index;
