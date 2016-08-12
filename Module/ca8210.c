@@ -1411,25 +1411,24 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
 {
 	uint8_t txcalval;
 
-	if (       channel >= 25) {
+	if (channel >= 25)
 		txcalval = 0xA7;
-	} else if (channel >= 23) {
+	else if (channel >= 23)
 		txcalval = 0xA8;
-	} else if (channel >= 22) {
+	else if (channel >= 22)
 		txcalval = 0xA9;
-	} else if (channel >= 20) {
+	else if (channel >= 20)
 		txcalval = 0xAA;
-	} else if (channel >= 17) {
+	else if (channel >= 17)
 		txcalval = 0xAB;
-	} else if (channel >= 16) {
+	else if (channel >= 16)
 		txcalval = 0xAC;
-	} else if (channel >= 14) {
+	else if (channel >= 14)
 		txcalval = 0xAD;
-	} else if (channel >= 12) {
+	else if (channel >= 12)
 		txcalval = 0xAE;
-	} else {
+	else
 		txcalval = 0xAF;
-	}
 
 	return TDME_SETSFR_request_sync(
 		1,
