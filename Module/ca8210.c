@@ -3093,31 +3093,17 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 
 	return 0;
 
-	error:
-	if (priv->cas_ctl.rx_buf) {
-		kfree(priv->cas_ctl.rx_buf);
-		priv->cas_ctl.rx_buf = NULL;
-	}
-
-	if (priv->cas_ctl.tx_in_buf) {
-		kfree(priv->cas_ctl.tx_in_buf);
-		priv->cas_ctl.tx_in_buf = NULL;
-	}
-
-	if (priv->cas_ctl.tx_buf) {
-		kfree(priv->cas_ctl.tx_buf);
-		priv->cas_ctl.tx_buf = NULL;
-	}
-
-	if (priv->cas_ctl.rx_out_buf) {
-		kfree(priv->cas_ctl.rx_out_buf);
-		priv->cas_ctl.rx_out_buf = NULL;
-	}
-
-	if (priv->cas_ctl.rx_final_buf) {
-		kfree(priv->cas_ctl.rx_final_buf);
-		priv->cas_ctl.rx_final_buf = NULL;
-	}
+error:
+	kfree(priv->cas_ctl.rx_buf);
+	priv->cas_ctl.rx_buf = NULL;
+	kfree(priv->cas_ctl.tx_in_buf);
+	priv->cas_ctl.tx_in_buf = NULL;
+	kfree(priv->cas_ctl.tx_buf);
+	priv->cas_ctl.tx_buf = NULL;
+	kfree(priv->cas_ctl.rx_out_buf);
+	priv->cas_ctl.rx_out_buf = NULL;
+	kfree(priv->cas_ctl.rx_final_buf);
+	priv->cas_ctl.rx_final_buf = NULL;
 
 	return status;
 }
@@ -3128,30 +3114,16 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
  */
 static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
-	if (priv->cas_ctl.rx_buf) {
-		kfree(priv->cas_ctl.rx_buf);
-		priv->cas_ctl.rx_buf = NULL;
-	}
-
-	if (priv->cas_ctl.tx_in_buf) {
-		kfree(priv->cas_ctl.tx_in_buf);
-		priv->cas_ctl.tx_in_buf = NULL;
-	}
-
-	if (priv->cas_ctl.tx_buf) {
-		kfree(priv->cas_ctl.tx_buf);
-		priv->cas_ctl.tx_buf = NULL;
-	}
-
-	if (priv->cas_ctl.rx_out_buf) {
-		kfree(priv->cas_ctl.rx_out_buf);
-		priv->cas_ctl.rx_out_buf = NULL;
-	}
-
-	if (priv->cas_ctl.rx_final_buf) {
-		kfree(priv->cas_ctl.rx_final_buf);
-		priv->cas_ctl.rx_final_buf = NULL;
-	}
+	kfree(priv->cas_ctl.rx_buf);
+	priv->cas_ctl.rx_buf = NULL;
+	kfree(priv->cas_ctl.tx_in_buf);
+	priv->cas_ctl.tx_in_buf = NULL;
+	kfree(priv->cas_ctl.tx_buf);
+	priv->cas_ctl.tx_buf = NULL;
+	kfree(priv->cas_ctl.rx_out_buf);
+	priv->cas_ctl.rx_out_buf = NULL;
+	kfree(priv->cas_ctl.rx_final_buf);
+	priv->cas_ctl.rx_final_buf = NULL;
 
 	flush_workqueue(priv->rx_workqueue);
 	destroy_workqueue(priv->rx_workqueue);
