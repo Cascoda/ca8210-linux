@@ -3422,7 +3422,7 @@ static void __exit ca8210_exit(void)
 }
 module_exit(ca8210_exit);
 
-MODULE_AUTHOR("Harry Morris");
+MODULE_AUTHOR("Harry Morris <h.morris@cascoda.com>");
 MODULE_DESCRIPTION("CA-8210 SoftMAC driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION("1.0");
