@@ -847,8 +847,8 @@ static void ca8210_spi_continueRead(void *arg)
 
 		dev_dbg(&spi->dev, "spi received cmdid: %d, len: %d\n",
 			priv->cas_ctl.rx_buf[0], priv->cas_ctl.rx_buf[1]);
-		if ( (priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
-		     (priv->cas_ctl.rx_buf[0] == SPI_NACK) ) {
+		if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
+		    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
 			ca8210_spi_writeDummy(spi);
 			up(&priv->cas_ctl.spi_sem);
 			return;
@@ -1208,8 +1208,8 @@ static int ca8210_spi_exchange(
 		mutex_unlock(&priv->sync_command_mutex);
 		startjiffies = jiffies;
 		while (1) {
-			if (mutex_lock_interruptible(&priv->sync_command_mutex))
-			{
+			if (mutex_lock_interruptible(
+				&priv->sync_command_mutex)) {
 				return -ERESTARTSYS;
 			}
 			if (!priv->sync_command_pending) {
@@ -1309,6 +1309,7 @@ static uint8_t TDME_SETSFR_request_sync(
 	int ret;
 	struct mac_message command, response;
 	struct spi_device *spi = device_ref;
+
 	command.command_id = SPI_TDME_SETSFR_REQUEST;
 	command.length = 3;
 	command.pdata.tdme_set_sfr_req.sfr_page    = sfr_page;
@@ -1455,7 +1456,7 @@ static uint8_t TDME_CheckPIBAttribute(
 	uint8_t status = MAC_SUCCESS;
 	uint8_t value;
 
-	value  = *((uint8_t*)pib_attribute_value);
+	value  = *((uint8_t *)pib_attribute_value);
 
 	switch (pib_attribute) {
 	/* PHY */
@@ -1578,25 +1579,25 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 	} else {
 		/* Look-Up Table for Setting Current and Frequency Trim values
 		 * for desired Output Power */
-		if (       txp_val  >  8) {
+		if (txp_val > 8) {
 			paib = 0x3F;
-		} else if (txp_val ==  8) {
+		} else if (txp_val == 8) {
 			paib = 0x32;
-		} else if (txp_val ==  7) {
+		} else if (txp_val == 7) {
 			paib = 0x22;
-		} else if (txp_val ==  6) {
+		} else if (txp_val == 6) {
 			paib = 0x18;
-		} else if (txp_val ==  5) {
+		} else if (txp_val == 5) {
 			paib = 0x10;
-		} else if (txp_val ==  4) {
+		} else if (txp_val == 4) {
 			paib = 0x0C;
-		} else if (txp_val ==  3) {
+		} else if (txp_val == 3) {
 			paib = 0x08;
-		} else if (txp_val ==  2) {
+		} else if (txp_val == 2) {
 			paib = 0x05;
-		} else if (txp_val ==  1) {
+		} else if (txp_val == 1) {
 			paib = 0x03;
-		} else if (txp_val ==  0) {
+		} else if (txp_val == 0) {
 			paib = 0x01;
 		} else         /*  <  0 */ {
 			paib = 0x00;
@@ -1643,6 +1644,7 @@ static uint8_t MCPS_DATA_request(
 {
 	struct secspec *pSec;
 	struct mac_message command;
+
 	#define DATAREQ (command.pdata.data_req)
 	command.command_id = SPI_MCPS_DATA_REQUEST;
 	DATAREQ.src_addr_mode = src_addr_mode;
@@ -1700,6 +1702,7 @@ static uint8_t MLME_RESET_request_sync(
 	uint8_t status;
 	struct mac_message command, response;
 	struct spi_device *spi = device_ref;
+
 	#define SIMPLEREQ (command.pdata)
 	#define SIMPLECNF (response.pdata)
 	command.command_id = SPI_MLME_RESET_REQUEST;
@@ -1710,8 +1713,7 @@ static uint8_t MLME_RESET_request_sync(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
-		device_ref))
-	{
+		device_ref)) {
 		dev_err(&spi->dev, "cascoda_api_downstream failed\n");
 		return MAC_SYSTEM_ERROR;
 	}
@@ -1756,19 +1758,19 @@ static uint8_t MLME_SET_request_sync(
 {
 	uint8_t status;
 	struct mac_message command, response;
+
 	#define SETREQ    (command.pdata.set_req)
 	#define SIMPLECNF (response.pdata)
 	/* pre-check the validity of pib_attribute values that are not checked
 	 * in MAC */
 	if (TDME_CheckPIBAttribute(
-		pib_attribute, pib_attribute_length, pib_attribute_value))
-	{
+		pib_attribute, pib_attribute_length, pib_attribute_value)) {
 		return MAC_INVALID_PARAMETER;
 	}
 
 	if (pib_attribute == PHY_CURRENT_CHANNEL) {
 		status = TDME_ChannelInit(
-			*((uint8_t*)pib_attribute_value),
+			*((uint8_t *)pib_attribute_value),
 			device_ref
 		);
 		if (status) {
@@ -1799,8 +1801,7 @@ static uint8_t MLME_SET_request_sync(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
-		device_ref))
-	{
+		device_ref)) {
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -1829,6 +1830,7 @@ static uint8_t HWME_SET_request_sync(
 )
 {
 	struct mac_message command, response;
+
 	command.command_id = SPI_HWME_SET_REQUEST;
 	command.length = 2 + hw_attribute_length;
 	command.pdata.hwme_set_req.hw_attribute = hw_attribute;
@@ -1843,8 +1845,7 @@ static uint8_t HWME_SET_request_sync(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
-		device_ref))
-	{
+		device_ref)) {
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -1871,6 +1872,7 @@ static uint8_t HWME_GET_request_sync(
 )
 {
 	struct mac_message command, response;
+
 	command.command_id = SPI_HWME_GET_REQUEST;
 	command.length = 1;
 	command.pdata.hwme_get_req.hw_attribute = hw_attribute;
@@ -1879,8 +1881,7 @@ static uint8_t HWME_GET_request_sync(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
-		device_ref))
-	{
+		device_ref)) {
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -2010,12 +2011,12 @@ static int ca8210_skb_rx(
 	}
 	hdr.source.mode = data_ind[0];
 	dev_dbg(&priv->spi->dev, "srcAddrMode: %#03x\n", hdr.source.mode);
-	hdr.source.pan_id = *(uint16_t*)&data_ind[1];
+	hdr.source.pan_id = *(uint16_t *)&data_ind[1];
 	dev_dbg(&priv->spi->dev, "srcPanId: %#06x\n", hdr.source.pan_id);
 	memcpy(&hdr.source.extended_addr, &data_ind[3], 8);
 	hdr.dest.mode = data_ind[11];
 	dev_dbg(&priv->spi->dev, "dstAddrMode: %#03x\n", hdr.dest.mode);
-	hdr.dest.pan_id = *(uint16_t*)&data_ind[12];
+	hdr.dest.pan_id = *(uint16_t *)&data_ind[12];
 	dev_dbg(&priv->spi->dev, "dstPanId: %#06x\n", hdr.dest.pan_id);
 	memcpy(&hdr.dest.extended_addr, &data_ind[14], 8);
 
@@ -2130,7 +2131,7 @@ static int ca8210_skb_tx(
 	secspec.security_level = header.sec.level;
 	secspec.key_id_mode = header.sec.key_id_mode;
 	if (secspec.key_id_mode == 2)
-  		memcpy(secspec.key_source, &header.sec.short_src, 4);
+		memcpy(secspec.key_source, &header.sec.short_src, 4);
 	else if (secspec.key_id_mode == 3)
 		memcpy(secspec.key_source, &header.sec.extended_src, 8);
 	secspec.key_index = header.sec.key_id;
@@ -2139,7 +2140,7 @@ static int ca8210_skb_tx(
 	status =  MCPS_DATA_request(header.source.mode,
 	                            header.dest.mode,
 	                            header.dest.pan_id,
-	                            (union macaddr*)&header.dest.extended_addr,
+	                            (union macaddr *)&header.dest.extended_addr,
 	                            skb->len - mac_len,
 	                            &skb->data[mac_len],
 	                            msduhandle,
@@ -2338,6 +2339,7 @@ static int ca8210_get_ed(struct ieee802154_hw *hw, uint8_t *level)
 {
 	uint8_t lenvar;
 	struct ca8210_priv *priv = hw->priv;
+
 	return link_to_linux_err(
 		HWME_GET_request_sync(HWME_EDVALUE, &lenvar, level, priv->spi)
 	);
@@ -2360,6 +2362,7 @@ static int ca8210_set_channel(
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
+
 	status = MLME_SET_request_sync(
 		PHY_CURRENT_CHANNEL,
 		0,
@@ -2465,6 +2468,7 @@ static int ca8210_set_hw_addr_filt(
 static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
 {
 	struct ca8210_priv *priv = hw->priv;
+
 	return link_to_linux_err(
 		MLME_SET_request_sync(PHY_TRANSMIT_POWER, 0, 1, &dbm, priv->spi)
 	);
@@ -2485,6 +2489,7 @@ static int ca8210_set_cca_mode(
 	uint8_t status;
 	uint8_t cca_mode;
 	struct ca8210_priv *priv = hw->priv;
+
 	cca_mode = cca->mode & 3;
 	if (cca_mode == 3 && cca->opt == NL802154_CCA_OPT_ENERGY_CARRIER_OR) {
 		/* cca_mode 0 == CS OR ED, 3 == CS AND ED */
@@ -2523,6 +2528,7 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, int32_t level)
 	uint8_t status;
 	uint8_t ed_threshold = level * 2 + 256;
 	struct ca8210_priv *priv = hw->priv;
+
 	status = HWME_SET_request_sync(
 		HWME_EDTHRESHOLD,
 		1,
@@ -2558,6 +2564,7 @@ static int ca8210_set_csma_params(
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
+
 	status = MLME_SET_request_sync(MAC_MIN_BE, 0, 1, &min_be, priv->spi);
 	if (status) {
 		dev_err(
@@ -2608,6 +2615,7 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 {
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
+
 	status = MLME_SET_request_sync(
 		MAC_MAX_FRAME_RETRIES,
 		0,
@@ -2653,6 +2661,7 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 static int ca8210_test_int_open(struct inode *inodp, struct file *filp)
 {
 	struct ca8210_priv *priv = inodp->i_private;
+
 	filp->private_data = priv;
 	return 0;
 }
@@ -2669,6 +2678,7 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 {
 	int ret;
 	uint8_t response[CA8210_SPI_BUF_SIZE];
+
 	if (buf[0] == SPI_MLME_SET_REQUEST) {
 		ret = TDME_CheckPIBAttribute(buf[2], buf[4], buf + 5);
 		if (ret) {
@@ -2681,9 +2691,9 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 			return ret;
 		}
 	}
-	if (        buf[0] == SPI_MLME_ASSOCIATE_REQUEST) {
+	if (buf[0] == SPI_MLME_ASSOCIATE_REQUEST) {
 		return TDME_ChannelInit(buf[2], device_ref);
-	} else if ( buf[0] == SPI_MLME_START_REQUEST) {
+	} else if (buf[0] == SPI_MLME_START_REQUEST) {
 		return TDME_ChannelInit(buf[4], device_ref);
 	} else if ((buf[0] == SPI_MLME_SET_REQUEST) &&
 	           (buf[2] == PHY_CURRENT_CHANNEL)) {
@@ -2784,10 +2794,10 @@ static ssize_t ca8210_test_int_user_read(
 }
 
 static const struct file_operations test_int_fops = {
-	.read = 			ca8210_test_int_user_read,
-	.write = 			ca8210_test_int_user_write,
-	.open = 			ca8210_test_int_open,
-	.release = 			NULL
+	.read =     ca8210_test_int_user_read,
+	.write =    ca8210_test_int_user_write,
+	.open =     ca8210_test_int_open,
+	.release =  NULL
 };
 
 /******************************************************************************/
@@ -3010,7 +3020,7 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 {
 	int status;
 
-	sema_init (&priv->cas_ctl.spi_sem, 1);
+	sema_init(&priv->cas_ctl.spi_sem, 1);
 
 	priv->cas_ctl.tx_buf = kmalloc(
 		CA8210_SPI_BUF_SIZE,
@@ -3167,8 +3177,8 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	                   IEEE802154_HW_FRAME_RETRIES |
 	                   IEEE802154_HW_CSMA_PARAMS;
 	ca8210_hw->phy->flags = WPAN_PHY_FLAG_TXPOWER |
-				WPAN_PHY_FLAG_CCA_ED_LEVEL |
-				WPAN_PHY_FLAG_CCA_MODE;
+	                        WPAN_PHY_FLAG_CCA_ED_LEVEL |
+	                        WPAN_PHY_FLAG_CCA_MODE;
 }
 
 /**
@@ -3226,6 +3236,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 static void ca8210_test_interface_clear(struct ca8210_priv *priv)
 {
 	struct ca8210_test *test = &priv->test;
+
 	if (!IS_ERR(test->ca8210_dfs_spi_int)) {
 		debugfs_remove(test->ca8210_dfs_spi_int);
 	}
@@ -3397,12 +3408,12 @@ MODULE_DEVICE_TABLE(of, ca8210_of_ids);
 
 static struct spi_driver ca8210_spi_driver = {
 	.driver = {
-		.name =			DRIVER_NAME,
-		.owner = 		THIS_MODULE,
+		.name =                 DRIVER_NAME,
+		.owner =                THIS_MODULE,
 		.of_match_table =       of_match_ptr(ca8210_of_ids),
 	},
-	.probe  = 			ca8210_probe,
-	.remove = 			ca8210_remove
+	.probe  =                       ca8210_probe,
+	.remove =                       ca8210_remove
 };
 
 /******************************************************************************/
