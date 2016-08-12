@@ -923,11 +923,10 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 			/* spi receive buffer cleared of last rx */
 			spin_unlock(&priv->lock);
 			break;
-		} else {
-			/* spi receive buffer still in use */
-			spin_unlock(&priv->lock);
-			msleep(1);
 		}
+		/* spi receive buffer still in use */
+		spin_unlock(&priv->lock);
+		msleep(1);
 	} while (1);
 
 	if (down_interruptible(&priv->cas_ctl.spi_sem))
@@ -1122,17 +1121,17 @@ static int ca8210_spi_write(
 			local_irq_restore(flags);
 			return status;
 		}
-		else {
-			dev_dbg(&spi->dev, "READ WHOLE CMD DURING TX\n");
-			/* whole packet read during transfer */
-			memcpy(
-				priv->cas_ctl.rx_final_buf,
-				priv->cas_ctl.tx_in_buf,
-				CA8210_SPI_BUF_SIZE
-			);
-			INIT_WORK(&priv->rx_work, ca8210_rx_done);
-			queue_work(priv->rx_workqueue, &priv->rx_work);
-		}
+
+		dev_dbg(&spi->dev, "READ WHOLE CMD DURING TX\n");
+		/* whole packet read during transfer */
+		memcpy(
+			priv->cas_ctl.rx_final_buf,
+			priv->cas_ctl.tx_in_buf,
+			CA8210_SPI_BUF_SIZE
+		);
+		INIT_WORK(&priv->rx_work, ca8210_rx_done);
+		queue_work(priv->rx_workqueue, &priv->rx_work);
+
 		#undef NUM_DATABYTES_SO_FAR
 	}
 	ca8210_spi_writeDummy(spi);
