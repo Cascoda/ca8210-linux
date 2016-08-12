@@ -2150,7 +2150,7 @@ static int ca8210_skb_tx(
 	                            header.fc.ack_request,
 	                            &secspec,
 	                            priv->spi);
-	return link_to_linux_err(status);;
+	return link_to_linux_err(status);
 }
 
 /**
