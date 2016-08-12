@@ -181,9 +181,9 @@
 #define NS_IEEE_ADDRESS                   (0xFF) /* Non-standard IEEE address */
 
 /* MAC Address Mode Definitions */
-#define MAC_MODE_NO_ADDR                ((unsigned)0x00)
-#define MAC_MODE_SHORT_ADDR             ((unsigned)0x02)
-#define MAC_MODE_LONG_ADDR              ((unsigned)0x03)
+#define MAC_MODE_NO_ADDR                ((unsigned int)0x00)
+#define MAC_MODE_SHORT_ADDR             ((unsigned int)0x02)
+#define MAC_MODE_LONG_ADDR              ((unsigned int)0x03)
 
 /* MAC constants */
 #define MAX_PHY_PACKET_SIZE            (127)
