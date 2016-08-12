@@ -989,7 +989,8 @@ static int ca8210_spi_write(
 	} else {
 		dummy = false;
 		/* Hold off on servicing interrupts, will get read during write
-		 * anyway */
+		 * anyway
+		 */
 		local_irq_save(flags);
 		if (down_interruptible(&priv->cas_ctl.spi_sem)) {
 			return -ERESTARTSYS;
@@ -1033,7 +1034,8 @@ static int ca8210_spi_write(
 
 		if (!dummy) {
 			/* Regular transmission, keep CS asserted in case of
-			 * incomplete concurrent read */
+			 * incomplete concurrent read
+			 */
 			priv->cas_ctl.tx_transfer.cs_change = 1;
 		} else {
 			/* dummy transmission, de-assert CS */
@@ -1077,7 +1079,8 @@ static int ca8210_spi_write(
 		if (priv->cas_ctl.tx_in_buf[1] > NUM_DATABYTES_SO_FAR) {
 			/* Need to read rest of data of packet */
 			/* Buffer what we have so far and set up the rest of the
-			 * transfer */
+			 * transfer
+			 */
 			dev_dbg(
 				&spi->dev,
 				"READ CMDID & LEN DURING TX, " \
@@ -1669,7 +1672,7 @@ static uint8_t MCPS_DATA_request(
 	pSec = (struct secspec *)(DATAREQ.msdu + msdu_length);
 	command.length = sizeof(struct MCPS_DATA_request_pset) -
 		MAX_DATA_SIZE + msdu_length;
-	if ( (security == NULL) || (security->security_level == 0) ) {
+	if ((security == NULL) || (security->security_level == 0)) {
 		pSec->security_level = 0;
 		command.length += 1;
 	} else {
@@ -1761,7 +1764,8 @@ static uint8_t MLME_SET_request_sync(
 	#define SETREQ    (command.pdata.set_req)
 	#define SIMPLECNF (response.pdata)
 	/* pre-check the validity of pib_attribute values that are not checked
-	 * in MAC */
+	 * in MAC
+	 */
 	if (TDME_CheckPIBAttribute(
 		pib_attribute, pib_attribute_length, pib_attribute_value)) {
 		return MAC_INVALID_PARAMETER;
@@ -1779,7 +1783,7 @@ static uint8_t MLME_SET_request_sync(
 
 	if (pib_attribute == PHY_TRANSMIT_POWER) {
 		return TDME_SetTxPower(
-			*((uint8_t*)pib_attribute_value),
+			*((uint8_t *)pib_attribute_value),
 			device_ref
 		);
 	}
@@ -2124,7 +2128,8 @@ static int ca8210_skb_tx(
 	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
 
 	/* Get addressing info from skb - ieee802154 layer creates a full
-	 * packet*/
+	 * packet
+	 */
 	mac_len = ieee802154_hdr_peek_addrs(skb, &header);
 
 	secspec.security_level = header.sec.level;
