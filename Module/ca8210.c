@@ -80,10 +80,10 @@
 
 /* external clock frequencies */
 #define ONE_MHZ      1000000
-#define TWO_MHZ      2*ONE_MHZ
-#define FOUR_MHZ     4*ONE_MHZ
-#define EIGHT_MHZ    8*ONE_MHZ
-#define SIXTEEN_MHZ  16*ONE_MHZ
+#define TWO_MHZ      (2*ONE_MHZ)
+#define FOUR_MHZ     (4*ONE_MHZ)
+#define EIGHT_MHZ    (8*ONE_MHZ)
+#define SIXTEEN_MHZ  (16*ONE_MHZ)
 
 /* spi constants */
 #define CA8210_SPI_BUF_SIZE 256
