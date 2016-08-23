@@ -2770,7 +2770,16 @@ static ssize_t ca8210_test_int_user_write(
 
 	ret = ca8210_test_check_upstream(command, priv->spi);
 	if (ret == 0) {
-		ca8210_spi_exchange(command, command[1] + 2, NULL, priv->spi);
+		ret = ca8210_spi_exchange(
+			command,
+			command[1] + 2,
+			NULL,
+			priv->spi
+		);
+		if (ret < 0) {
+			/* effectively 0 bytes were written successfully */
+			return 0;
+		}
 	}
 
 	return len;
