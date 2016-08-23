@@ -1061,8 +1061,12 @@ static int ca8210_spi_write(
 				"status %d from spi_sync in write\n",
 				status
 			);
-		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == '\xF0') {
+		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
 			/* ca8210 is busy */
+			dev_info(
+				&spi->dev,
+				"ca8210 was busy during attempted write\n"
+			);
 			ca8210_spi_writeDummy(spi);
 			up(&priv->cas_ctl.spi_sem);
 			local_irq_restore(flags);
@@ -1200,12 +1204,10 @@ static int ca8210_spi_exchange(
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
 
-	do {
-		status = ca8210_spi_write(priv->spi, buf, len);
-	} while (status == -EBUSY);
+	status = ca8210_spi_write(priv->spi, buf, len);
 
 	if (status < 0) {
-		dev_err(&spi->dev, "spi write failed!\n");
+		dev_warn(&spi->dev, "spi write failed, returned %d\n", status);
 		return status;
 	}
 
@@ -2180,12 +2182,23 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 		async_tx_work
 	);
 	unsigned long flags;
+	int ret;
 
 	if (priv->tx_skb == NULL) {
 		return;
 	}
 
-	ca8210_skb_tx(priv->tx_skb, priv->nextmsduhandle, priv);
+	ret = ca8210_skb_tx(priv->tx_skb, priv->nextmsduhandle, priv);
+	if (ret < 0) {
+		dev_warn(
+			&priv->spi->dev,
+			"Failed to transmit skb, returned %d",
+			ret
+		);
+		/* retry transmission higher up */
+		ieee802154_wake_queue(priv->hw);
+		return;
+	}
 
 	queue_delayed_work(priv->async_tx_workqueue,
 	                   &priv->async_tx_timeout_work,
