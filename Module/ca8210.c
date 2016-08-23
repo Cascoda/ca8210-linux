@@ -1063,6 +1063,10 @@ static int ca8210_spi_write(
 			);
 		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
 			/* ca8210 is busy */
+			dev_info(
+				&spi->dev,
+				"ca8210 was busy during attempted write\n"
+			);
 			ca8210_spi_writeDummy(spi);
 			up(&priv->cas_ctl.spi_sem);
 			local_irq_restore(flags);
@@ -1205,7 +1209,7 @@ static int ca8210_spi_exchange(
 	} while (status == -EBUSY);
 
 	if (status < 0) {
-		dev_err(&spi->dev, "spi write failed!\n");
+		dev_warn(&spi->dev, "spi write failed, returned %d\n", status);
 		return status;
 	}
 
