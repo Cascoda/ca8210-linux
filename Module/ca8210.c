@@ -1204,9 +1204,7 @@ static int ca8210_spi_exchange(
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
 
-	do {
-		status = ca8210_spi_write(priv->spi, buf, len);
-	} while (status == -EBUSY);
+	status = ca8210_spi_write(priv->spi, buf, len);
 
 	if (status < 0) {
 		dev_warn(&spi->dev, "spi write failed, returned %d\n", status);
@@ -2184,12 +2182,23 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 		async_tx_work
 	);
 	unsigned long flags;
+	int ret;
 
 	if (priv->tx_skb == NULL) {
 		return;
 	}
 
-	ca8210_skb_tx(priv->tx_skb, priv->nextmsduhandle, priv);
+	ret = ca8210_skb_tx(priv->tx_skb, priv->nextmsduhandle, priv);
+	if (ret < 0) {
+		dev_warn(
+			&priv->spi->dev,
+			"Failed to transmit skb, returned %d",
+			ret
+		);
+		/* retry transmission higher up */
+		ieee802154_wake_queue(priv->hw);
+		return;
+	}
 
 	queue_delayed_work(priv->async_tx_workqueue,
 	                   &priv->async_tx_timeout_work,
