@@ -3131,6 +3131,9 @@ error:
  */
 static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
+	flush_workqueue(priv->rx_workqueue);
+	destroy_workqueue(priv->rx_workqueue);
+
 	kfree(priv->cas_ctl.rx_buf);
 	priv->cas_ctl.rx_buf = NULL;
 	kfree(priv->cas_ctl.tx_in_buf);
@@ -3141,9 +3144,6 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_out_buf = NULL;
 	kfree(priv->cas_ctl.rx_final_buf);
 	priv->cas_ctl.rx_final_buf = NULL;
-
-	flush_workqueue(priv->rx_workqueue);
-	destroy_workqueue(priv->rx_workqueue);
 }
 
 /**
@@ -3255,8 +3255,8 @@ static int ca8210_remove(struct spi_device *spi_device)
 			ca8210_unregister_ext_clock(spi_device);
 			ca8210_config_extern_clk(pdata, spi_device, 0);
 		}
-		kfree(pdata);
 		free_irq(pdata->irq_id, spi_device->dev.driver_data);
+		kfree(pdata);
 		spi_device->dev.platform_data = NULL;
 	}
 	/* get spi_device private data */
