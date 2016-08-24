@@ -1197,9 +1197,9 @@ static int ca8210_spi_exchange(
 				status
 			);
 			if (status == -EBUSY) {
-				mdelay(1);
+				mdelay(2 << write_retries);
 				write_retries++;
-				if (write_retries > 3) {
+				if (write_retries > 4) {
 					dev_err(
 						&spi->dev,
 						"too many retries!\n"
@@ -1208,7 +1208,8 @@ static int ca8210_spi_exchange(
 				}
 				dev_info(
 					&spi->dev,
-					"retrying...\n"
+					"retry %d...\n",
+					write_retries
 				);
 			} else {
 				return status;
