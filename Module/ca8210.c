@@ -385,6 +385,7 @@ struct ca8210_priv {
 	uint8_t *sync_command_response;
 	bool ca8210_is_awake;
 	bool irq_being_serviced;
+	int sync_down, sync_up;
 };
 
 /**
@@ -708,6 +709,9 @@ static void ca8210_rx_done(struct work_struct *work)
 		priv->sync_command_pending = false;
 	} else {
 		ca8210_test_int_driver_write(buf, len, priv->spi);
+		if (buf[0] & SPI_SYN) {
+			priv->sync_up++;
+		}
 	}
 	mutex_unlock(&priv->sync_command_mutex);
 
@@ -2786,6 +2790,9 @@ static ssize_t ca8210_test_int_user_write(
 			/* effectively 0 bytes were written successfully */
 			return 0;
 		}
+		if (command[0] & SPI_SYN) {
+			priv->sync_down++;
+		}
 	}
 
 	return len;
@@ -3287,6 +3294,7 @@ static int ca8210_remove(struct spi_device *spi_device)
 	/* get spi_device private data */
 	priv = spi_get_drvdata(spi_device);
 	if (priv) {
+		dev_info(&spi_device->dev, "sync_down = %d, sync_up = %d\n", priv->sync_down, priv->sync_up);
 		ca8210_dev_com_clear(spi_device->dev.driver_data);
 		if (priv->hw) {
 			if (priv->hw_registered) {
@@ -3411,6 +3419,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 	priv->hw_registered = true;
+	priv->sync_up = 0;
+	priv->sync_down = 0;
 
 	return 0;
 error:
