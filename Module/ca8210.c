@@ -1162,13 +1162,35 @@ static int ca8210_spi_exchange(
 	unsigned long startjiffies, currentjiffies;
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
+	int write_retries = 0;
 
-	status = ca8210_spi_write(priv->spi, buf, len);
-
-	if (status < 0) {
-		dev_warn(&spi->dev, "spi write failed, returned %d\n", status);
-		return status;
-	}
+	do {
+		status = ca8210_spi_write(priv->spi, buf, len);
+		if (status < 0) {
+			dev_warn(
+				&spi->dev,
+				"spi write failed, returned %d\n",
+				status
+			);
+			if (status == -EBUSY) {
+				mdelay(1);
+				write_retries++;
+				if (write_retries > 3) {
+					dev_err(
+						&spi->dev,
+						"too many retries!\n"
+					);
+					return status;
+				}
+				dev_info(
+					&spi->dev,
+					"retrying...\n"
+				);
+			} else {
+				return status;
+			}
+		}
+	} while (status < 0);
 
 	if ((buf[0] & SPI_SYN) && response) { /* if sync wait for confirm */
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
