@@ -1000,8 +1000,8 @@ static int ca8210_spi_write(
 	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
 	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
 	priv->cas_ctl.tx_transfer.delay_usecs = 0;
-	priv->cas_ctl.tx_transfer.len = len;
-	priv->cas_ctl.tx_msg.frame_length = len;
+	priv->cas_ctl.tx_transfer.len = 1;
+	priv->cas_ctl.tx_msg.frame_length = 1;
 
 	if (!dummy) {
 		/* Regular transmission, keep CS asserted in case of
@@ -1032,6 +1032,30 @@ static int ca8210_spi_write(
 		up(&priv->cas_ctl.spi_sem);
 		local_irq_restore(flags);
 		return -EBUSY;
+	} else if (!dummy) {
+		spi_message_init(&priv->cas_ctl.tx_msg);
+		priv->cas_ctl.tx_msg.spi = spi;
+		priv->cas_ctl.tx_msg.is_dma_mapped = false;
+
+		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + 1;
+		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + 1;
+		priv->cas_ctl.tx_transfer.delay_usecs = 0;
+		priv->cas_ctl.tx_transfer.len = len - 1;
+		priv->cas_ctl.tx_msg.frame_length = len - 1;
+		priv->cas_ctl.tx_transfer.cs_change = 1;
+		spi_message_add_tail(
+			&priv->cas_ctl.tx_transfer,
+			&priv->cas_ctl.tx_msg
+		);
+
+		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
+		if (status < 0) {
+			dev_crit(
+				&spi->dev,
+				"status %d from spi_sync in write\n",
+				status
+			);
+		}
 	}
 
 	if (dummy)
