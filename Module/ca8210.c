@@ -300,8 +300,6 @@
  *                        reception
  * @rx_final_buf:         destination array for finished receive packet
  * @spi_sem:              semaphore protecting spi interface
- * @data_received_so_far  number of bytes received
- * @data_left_to_receive  number of bytes still to receive
  *
  * This structure stores all the necessary data passed around during spi
  * exchange for a single device.
@@ -317,9 +315,6 @@ struct cas_control {
 	uint8_t *rx_final_buf;
 
 	struct semaphore spi_sem;
-
-	int data_received_so_far;
-	int data_left_to_receive;
 };
 
 /**
@@ -842,54 +837,30 @@ static void ca8210_spi_continueRead(void *arg)
 	priv->cas_ctl.rx_msg.spi = spi;
 	priv->cas_ctl.rx_msg.is_dma_mapped = false;
 
-	if (priv->cas_ctl.rx_final_buf[1] == SPI_IDLE) {
-		/* Start of data read */
-		priv->cas_ctl.data_received_so_far = 0;
+	dev_dbg(
+		&spi->dev,
+		"spi received cmdid: %d, len: %d\n",
+		priv->cas_ctl.rx_buf[0],
+		priv->cas_ctl.rx_buf[1]
+	);
 
-		dev_dbg(&spi->dev, "spi received cmdid: %d, len: %d\n",
-			priv->cas_ctl.rx_buf[0], priv->cas_ctl.rx_buf[1]);
-		if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
-		    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
-			ca8210_spi_writeDummy(spi);
-			up(&priv->cas_ctl.spi_sem);
-			return;
-		}
-
-		/* Regular data read start */
-		priv->cas_ctl.data_left_to_receive =
-			(int) priv->cas_ctl.rx_buf[1];
-		priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
-		priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
+	if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
+	    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
+		ca8210_spi_writeDummy(spi);
+		up(&priv->cas_ctl.spi_sem);
+		return;
 	}
 
-	#define SPLIT_RX_LEN 64
-	priv->cas_ctl.rx_transfer.rx_buf =
-		priv->cas_ctl.rx_buf + priv->cas_ctl.data_received_so_far;
-	if (priv->cas_ctl.data_left_to_receive > SPLIT_RX_LEN) {
-		/* Middle of data */
-		priv->cas_ctl.rx_transfer.len = SPLIT_RX_LEN;
-		priv->cas_ctl.rx_msg.frame_length = SPLIT_RX_LEN;
-		priv->cas_ctl.rx_transfer.cs_change = 1;
-		priv->cas_ctl.rx_transfer.delay_usecs = 200;
-		priv->cas_ctl.rx_msg.complete = ca8210_spi_continueRead;
-		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far += SPLIT_RX_LEN;
-		priv->cas_ctl.data_left_to_receive -= SPLIT_RX_LEN;
-	} else {
-		/* End of data */
-		priv->cas_ctl.rx_transfer.len =
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_msg.frame_length =
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_transfer.cs_change = 0;
-		priv->cas_ctl.rx_transfer.delay_usecs = 0;
-		priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
-		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far +=
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.data_left_to_receive = 0;
-	}
-	#undef SPLIT_RX_LEN
+	priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
+	priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
+
+	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
+	priv->cas_ctl.rx_transfer.len = priv->cas_ctl.rx_final_buf[1];
+	priv->cas_ctl.rx_msg.frame_length = priv->cas_ctl.rx_final_buf[1];
+	priv->cas_ctl.rx_transfer.cs_change = 0;
+	priv->cas_ctl.rx_transfer.delay_usecs = 0;
+	priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
+	priv->cas_ctl.rx_msg.context = spi;
 
 	spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
 
@@ -1022,58 +993,46 @@ static int ca8210_spi_write(
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_buf[i]);
 	}
 
-	#define SPLIT_TX_LEN 64
-	for (i = 0; i < len; i += SPLIT_TX_LEN) {
-		spi_message_init(&priv->cas_ctl.tx_msg);
-		priv->cas_ctl.tx_msg.spi = spi;
-		priv->cas_ctl.tx_msg.is_dma_mapped = false;
+	spi_message_init(&priv->cas_ctl.tx_msg);
+	priv->cas_ctl.tx_msg.spi = spi;
+	priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
-		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + i;
-		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + i;
-		priv->cas_ctl.tx_transfer.delay_usecs = 200;
-		if (len-i < SPLIT_TX_LEN) {
-			priv->cas_ctl.tx_transfer.len = len - i;
-			priv->cas_ctl.tx_msg.frame_length = len - i;
-		} else {
-			priv->cas_ctl.tx_transfer.len = SPLIT_TX_LEN;
-			priv->cas_ctl.tx_msg.frame_length = SPLIT_TX_LEN;
-		}
+	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
+	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
+	priv->cas_ctl.tx_transfer.delay_usecs = 0;
+	priv->cas_ctl.tx_transfer.len = len;
+	priv->cas_ctl.tx_msg.frame_length = len;
 
-		if (!dummy) {
-			/* Regular transmission, keep CS asserted in case of
-			 * incomplete concurrent read
-			 */
-			priv->cas_ctl.tx_transfer.cs_change = 1;
-		} else {
-			/* dummy transmission, de-assert CS */
-			priv->cas_ctl.tx_transfer.cs_change = 0;
-		}
-
-		spi_message_add_tail(
-			&priv->cas_ctl.tx_transfer,
-			&priv->cas_ctl.tx_msg
-		);
-
-		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
-		if (status < 0) {
-			dev_crit(
-				&spi->dev,
-				"status %d from spi_sync in write\n",
-				status
-			);
-		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
-			/* ca8210 is busy */
-			dev_info(
-				&spi->dev,
-				"ca8210 was busy during attempted write\n"
-			);
-			ca8210_spi_writeDummy(spi);
-			up(&priv->cas_ctl.spi_sem);
-			local_irq_restore(flags);
-			return -EBUSY;
-		}
+	if (!dummy) {
+		/* Regular transmission, keep CS asserted in case of
+		 * incomplete concurrent read
+		 */
+		priv->cas_ctl.tx_transfer.cs_change = 1;
+	} else {
+		/* dummy transmission, de-assert CS */
+		priv->cas_ctl.tx_transfer.cs_change = 0;
 	}
-	#undef SPLIT_TX_LEN
+
+	spi_message_add_tail(
+		&priv->cas_ctl.tx_transfer,
+		&priv->cas_ctl.tx_msg
+	);
+
+	status = spi_sync(spi, &priv->cas_ctl.tx_msg);
+	if (status < 0) {
+		dev_crit(
+			&spi->dev,
+			"status %d from spi_sync in write\n",
+			status
+		);
+	} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
+		/* ca8210 is busy */
+		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
+		ca8210_spi_writeDummy(spi);
+		up(&priv->cas_ctl.spi_sem);
+		local_irq_restore(flags);
+		return -EBUSY;
+	}
 
 	if (dummy)
 		return status;
