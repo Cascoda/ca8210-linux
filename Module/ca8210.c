@@ -696,28 +696,31 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-		return;
-	}
-	if (priv->sync_command_pending) {
-		if (priv->sync_command_response == NULL) {
-			priv->sync_command_pending = false;
-			mutex_unlock(&priv->sync_command_mutex);
-			dev_crit(
-				&priv->spi->dev,
-				"Sync command provided no response buffer\n"
-			);
+	if (buf[0] & SPI_SYN) {
+		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 			return;
 		}
-		memcpy(priv->sync_command_response, buf, len);
-		priv->sync_command_pending = false;
-	} else {
-		ca8210_test_int_driver_write(buf, len, priv->spi);
-		if (buf[0] & SPI_SYN) {
+		if (priv->sync_command_pending) {
+			if (priv->sync_command_response == NULL) {
+				priv->sync_command_pending = false;
+				mutex_unlock(&priv->sync_command_mutex);
+				dev_crit(
+					&priv->spi->dev,
+					"Sync command provided no response buffer\n"
+				);
+				return;
+			}
+			memcpy(priv->sync_command_response, buf, len);
+			priv->sync_command_pending = false;
+			mutex_unlock(&priv->sync_command_mutex);
+		} else {
+			mutex_unlock(&priv->sync_command_mutex);
+			ca8210_test_int_driver_write(buf, len, priv->spi);
 			priv->sync_up++;
 		}
+	} else {
+		ca8210_test_int_driver_write(buf, len, priv->spi);
 	}
-	mutex_unlock(&priv->sync_command_mutex);
 
 	ca8210_net_rx(priv->hw, buf, len);
 	if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
@@ -1196,6 +1199,12 @@ static int ca8210_spi_exchange(
 	struct ca8210_priv *priv = spi->dev.driver_data;
 	int write_retries = 0;
 
+	if ((buf[0] & SPI_SYN) && response) { /* if sync lock mutex */
+		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
+			return -ERESTARTSYS;
+		}
+	}
+
 	do {
 		status = ca8210_spi_write(priv->spi, buf, len);
 		if (status < 0) {
@@ -1225,34 +1234,34 @@ static int ca8210_spi_exchange(
 		}
 	} while (status < 0);
 
-	if ((buf[0] & SPI_SYN) && response) { /* if sync wait for confirm */
-		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
+	if (!((buf[0] & SPI_SYN) && response)) {
+		return 0;
+	}
+
+	/* if sync wait for confirm */
+	priv->sync_command_response = response;
+	priv->sync_command_pending = true;
+	mutex_unlock(&priv->sync_command_mutex);
+	startjiffies = jiffies;
+	while (1) {
+		if (mutex_lock_interruptible(
+			&priv->sync_command_mutex)) {
 			return -ERESTARTSYS;
 		}
-		priv->sync_command_response = response;
-		priv->sync_command_pending = true;
-		mutex_unlock(&priv->sync_command_mutex);
-		startjiffies = jiffies;
-		while (1) {
-			if (mutex_lock_interruptible(
-				&priv->sync_command_mutex)) {
-				return -ERESTARTSYS;
-			}
-			if (!priv->sync_command_pending) {
-				priv->sync_command_response = NULL;
-				mutex_unlock(&priv->sync_command_mutex);
-				break;
-			}
+		if (!priv->sync_command_pending) {
+			priv->sync_command_response = NULL;
 			mutex_unlock(&priv->sync_command_mutex);
-			currentjiffies = jiffies;
-			if ((currentjiffies - startjiffies) >
-			    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
-				dev_err(
-					&spi->dev,
-					"Synchronous confirm timeout\n"
-				);
-				return -ETIME;
-			}
+			break;
+		}
+		mutex_unlock(&priv->sync_command_mutex);
+		currentjiffies = jiffies;
+		if ((currentjiffies - startjiffies) >
+		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
+			dev_err(
+				&spi->dev,
+				"Synchronous confirm timeout\n"
+			);
+			return -ETIME;
 		}
 	}
 
