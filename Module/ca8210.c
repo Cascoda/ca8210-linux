@@ -1221,6 +1221,9 @@ static int ca8210_spi_exchange(
 						&spi->dev,
 						"too many retries!\n"
 					);
+					if (((buf[0] & SPI_SYN) && response)) {
+						mutex_unlock(&priv->sync_command_mutex);
+					}
 					return status;
 				}
 				dev_info(
@@ -1229,6 +1232,9 @@ static int ca8210_spi_exchange(
 					write_retries
 				);
 			} else {
+				if (((buf[0] & SPI_SYN) && response)) {
+					mutex_unlock(&priv->sync_command_mutex);
+				}
 				return status;
 			}
 		}
