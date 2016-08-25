@@ -386,6 +386,7 @@ struct ca8210_priv {
 	bool ca8210_is_awake;
 	bool irq_being_serviced;
 	int sync_down, sync_up;
+	struct mutex awake_mutex;
 };
 
 /**
@@ -624,11 +625,14 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
-	unsigned long flags;
 	unsigned long startjiffies;
 
 	#define RESET_OFF 0
 	#define RESET_ON 1
+
+	if (mutex_lock_interruptible(&priv->awake_mutex)) {
+		return;
+	}
 
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
 	priv->ca8210_is_awake = false;
@@ -637,7 +641,6 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 
 	/* Wait until wakeup indication seen */
 	startjiffies = jiffies;
-	spin_lock_irqsave(&priv->lock, flags);
 	while (!priv->ca8210_is_awake) {
 		if (jiffies - startjiffies >
 		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
@@ -647,11 +650,12 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 			);
 			break;
 		}
-		spin_unlock_irqrestore(&priv->lock, flags);
+		mutex_unlock(&priv->awake_mutex);
 		msleep(1);
-		spin_lock_irqsave(&priv->lock, flags);
+		if (mutex_lock_interruptible(&priv->awake_mutex)) {
+			return;
+		}
 	}
-	spin_unlock_irqrestore(&priv->lock, flags);
 
 	dev_dbg(&spi->dev, "Reset the device\n");
 	#undef RESET_OFF
@@ -3346,6 +3350,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->irq_being_serviced = false;
 	mutex_init(&priv->sync_command_mutex);
+	mutex_init(&priv->awake_mutex);
 	spi_set_drvdata(priv->spi, priv);
 
 	ca8210_test_interface_init(priv);
