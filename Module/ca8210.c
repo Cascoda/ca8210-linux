@@ -3425,6 +3425,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 
+	msleep(100);
+
 	ca8210_reset_send(priv->spi, 1);
 
 	ret = TDME_ChipInit(priv->spi);
