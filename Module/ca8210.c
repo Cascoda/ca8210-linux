@@ -1208,15 +1208,10 @@ static int ca8210_spi_exchange(
 	do {
 		status = ca8210_spi_write(priv->spi, buf, len);
 		if (status < 0) {
-			dev_warn(
-				&spi->dev,
-				"spi write failed, returned %d\n",
-				status
-			);
 			if (status == -EBUSY) {
-				mdelay(2 << write_retries);
+				msleep(1);
 				write_retries++;
-				if (write_retries > 4) {
+				if (write_retries > 100) {
 					dev_err(
 						&spi->dev,
 						"too many retries!\n"
@@ -1224,14 +1219,19 @@ static int ca8210_spi_exchange(
 					if (((buf[0] & SPI_SYN) && response)) {
 						mutex_unlock(&priv->sync_command_mutex);
 					}
-					return status;
+					return -EAGAIN;
 				}
 				dev_info(
 					&spi->dev,
-					"retry %d...\n",
+					"spi write retry %d...\n",
 					write_retries
 				);
 			} else {
+				dev_warn(
+					&spi->dev,
+					"spi write failed, returned %d\n",
+					status
+				);
 				if (((buf[0] & SPI_SYN) && response)) {
 					mutex_unlock(&priv->sync_command_mutex);
 				}
