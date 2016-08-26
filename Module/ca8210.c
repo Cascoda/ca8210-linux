@@ -2794,11 +2794,23 @@ static ssize_t ca8210_test_int_user_write(
 	struct ca8210_priv *priv = filp->private_data;
 	uint8_t command[CA8210_SPI_BUF_SIZE];
 
-	if (len > CA8210_SPI_BUF_SIZE)
-		return 0;
+	if (len > CA8210_SPI_BUF_SIZE) {
+		dev_warn(
+			&priv->spi->dev,
+			"userspace requested erroneously long write (%d)\n",
+			len
+		);
+		return -EMSGSIZE;
+	}
 
-	if (copy_from_user(command, in_buf, len))
-		return 0;
+	ret = copy_from_user(command, in_buf, len);
+	if (ret) {
+		dev_err(
+			&priv->spi->dev,
+			"%d bytes could not be copied from userspace\n"
+		);
+		return -EIO;
+	}
 
 	ret = ca8210_test_check_upstream(command, priv->spi);
 	if (ret == 0) {
@@ -2810,7 +2822,11 @@ static ssize_t ca8210_test_int_user_write(
 		);
 		if (ret < 0) {
 			/* effectively 0 bytes were written successfully */
-			return 0;
+			dev_err(
+				&priv->spi->dev,
+				"spi exchange failed\n"
+			);
+			return ret;
 		}
 		if (command[0] & SPI_SYN) {
 			priv->sync_down++;
