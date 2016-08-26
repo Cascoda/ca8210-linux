@@ -300,8 +300,6 @@
  *                        reception
  * @rx_final_buf:         destination array for finished receive packet
  * @spi_sem:              semaphore protecting spi interface
- * @data_received_so_far  number of bytes received
- * @data_left_to_receive  number of bytes still to receive
  *
  * This structure stores all the necessary data passed around during spi
  * exchange for a single device.
@@ -317,9 +315,6 @@ struct cas_control {
 	uint8_t *rx_final_buf;
 
 	struct semaphore spi_sem;
-
-	int data_received_so_far;
-	int data_left_to_receive;
 };
 
 /**
@@ -390,6 +385,8 @@ struct ca8210_priv {
 	uint8_t *sync_command_response;
 	bool ca8210_is_awake;
 	bool irq_being_serviced;
+	int sync_down, sync_up;
+	struct mutex awake_mutex;
 };
 
 /**
@@ -628,11 +625,14 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
-	unsigned long flags;
 	unsigned long startjiffies;
 
 	#define RESET_OFF 0
 	#define RESET_ON 1
+
+	if (mutex_lock_interruptible(&priv->awake_mutex)) {
+		return;
+	}
 
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
 	priv->ca8210_is_awake = false;
@@ -641,7 +641,6 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 
 	/* Wait until wakeup indication seen */
 	startjiffies = jiffies;
-	spin_lock_irqsave(&priv->lock, flags);
 	while (!priv->ca8210_is_awake) {
 		if (jiffies - startjiffies >
 		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
@@ -651,11 +650,12 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 			);
 			break;
 		}
-		spin_unlock_irqrestore(&priv->lock, flags);
+		mutex_unlock(&priv->awake_mutex);
 		msleep(1);
-		spin_lock_irqsave(&priv->lock, flags);
+		if (mutex_lock_interruptible(&priv->awake_mutex)) {
+			return;
+		}
 	}
-	spin_unlock_irqrestore(&priv->lock, flags);
 
 	dev_dbg(&spi->dev, "Reset the device\n");
 	#undef RESET_OFF
@@ -696,25 +696,31 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-		return;
-	}
-	if (priv->sync_command_pending) {
-		if (priv->sync_command_response == NULL) {
-			priv->sync_command_pending = false;
-			mutex_unlock(&priv->sync_command_mutex);
-			dev_crit(
-				&priv->spi->dev,
-				"Sync command provided no response buffer\n"
-			);
+	if (buf[0] & SPI_SYN) {
+		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 			return;
 		}
-		memcpy(priv->sync_command_response, buf, len);
-		priv->sync_command_pending = false;
+		if (priv->sync_command_pending) {
+			if (priv->sync_command_response == NULL) {
+				priv->sync_command_pending = false;
+				mutex_unlock(&priv->sync_command_mutex);
+				dev_crit(
+					&priv->spi->dev,
+					"Sync command provided no response buffer\n"
+				);
+				return;
+			}
+			memcpy(priv->sync_command_response, buf, len);
+			priv->sync_command_pending = false;
+			mutex_unlock(&priv->sync_command_mutex);
+		} else {
+			mutex_unlock(&priv->sync_command_mutex);
+			ca8210_test_int_driver_write(buf, len, priv->spi);
+			priv->sync_up++;
+		}
 	} else {
 		ca8210_test_int_driver_write(buf, len, priv->spi);
 	}
-	mutex_unlock(&priv->sync_command_mutex);
 
 	ca8210_net_rx(priv->hw, buf, len);
 	if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
@@ -842,54 +848,30 @@ static void ca8210_spi_continueRead(void *arg)
 	priv->cas_ctl.rx_msg.spi = spi;
 	priv->cas_ctl.rx_msg.is_dma_mapped = false;
 
-	if (priv->cas_ctl.rx_final_buf[1] == SPI_IDLE) {
-		/* Start of data read */
-		priv->cas_ctl.data_received_so_far = 0;
+	dev_dbg(
+		&spi->dev,
+		"spi received cmdid: %d, len: %d\n",
+		priv->cas_ctl.rx_buf[0],
+		priv->cas_ctl.rx_buf[1]
+	);
 
-		dev_dbg(&spi->dev, "spi received cmdid: %d, len: %d\n",
-			priv->cas_ctl.rx_buf[0], priv->cas_ctl.rx_buf[1]);
-		if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
-		    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
-			ca8210_spi_writeDummy(spi);
-			up(&priv->cas_ctl.spi_sem);
-			return;
-		}
-
-		/* Regular data read start */
-		priv->cas_ctl.data_left_to_receive =
-			(int) priv->cas_ctl.rx_buf[1];
-		priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
-		priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
+	if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
+	    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
+		ca8210_spi_writeDummy(spi);
+		up(&priv->cas_ctl.spi_sem);
+		return;
 	}
 
-	#define SPLIT_RX_LEN 64
-	priv->cas_ctl.rx_transfer.rx_buf =
-		priv->cas_ctl.rx_buf + priv->cas_ctl.data_received_so_far;
-	if (priv->cas_ctl.data_left_to_receive > SPLIT_RX_LEN) {
-		/* Middle of data */
-		priv->cas_ctl.rx_transfer.len = SPLIT_RX_LEN;
-		priv->cas_ctl.rx_msg.frame_length = SPLIT_RX_LEN;
-		priv->cas_ctl.rx_transfer.cs_change = 1;
-		priv->cas_ctl.rx_transfer.delay_usecs = 200;
-		priv->cas_ctl.rx_msg.complete = ca8210_spi_continueRead;
-		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far += SPLIT_RX_LEN;
-		priv->cas_ctl.data_left_to_receive -= SPLIT_RX_LEN;
-	} else {
-		/* End of data */
-		priv->cas_ctl.rx_transfer.len =
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_msg.frame_length =
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.rx_transfer.cs_change = 0;
-		priv->cas_ctl.rx_transfer.delay_usecs = 0;
-		priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
-		priv->cas_ctl.rx_msg.context = spi;
-		priv->cas_ctl.data_received_so_far +=
-			priv->cas_ctl.data_left_to_receive;
-		priv->cas_ctl.data_left_to_receive = 0;
-	}
-	#undef SPLIT_RX_LEN
+	priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
+	priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
+
+	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
+	priv->cas_ctl.rx_transfer.len = priv->cas_ctl.rx_final_buf[1];
+	priv->cas_ctl.rx_msg.frame_length = priv->cas_ctl.rx_final_buf[1];
+	priv->cas_ctl.rx_transfer.cs_change = 0;
+	priv->cas_ctl.rx_transfer.delay_usecs = 0;
+	priv->cas_ctl.rx_msg.complete = ca8210_spi_finishRead;
+	priv->cas_ctl.rx_msg.context = spi;
 
 	spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
 
@@ -1022,33 +1004,56 @@ static int ca8210_spi_write(
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_buf[i]);
 	}
 
-	#define SPLIT_TX_LEN 64
-	for (i = 0; i < len; i += SPLIT_TX_LEN) {
+	spi_message_init(&priv->cas_ctl.tx_msg);
+	priv->cas_ctl.tx_msg.spi = spi;
+	priv->cas_ctl.tx_msg.is_dma_mapped = false;
+
+	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
+	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
+	priv->cas_ctl.tx_transfer.delay_usecs = 0;
+	priv->cas_ctl.tx_transfer.len = 1;
+	priv->cas_ctl.tx_msg.frame_length = 1;
+
+	if (!dummy) {
+		/* Regular transmission, keep CS asserted in case of
+		 * incomplete concurrent read
+		 */
+		priv->cas_ctl.tx_transfer.cs_change = 1;
+	} else {
+		/* dummy transmission, de-assert CS */
+		priv->cas_ctl.tx_transfer.cs_change = 0;
+	}
+
+	spi_message_add_tail(
+		&priv->cas_ctl.tx_transfer,
+		&priv->cas_ctl.tx_msg
+	);
+
+	status = spi_sync(spi, &priv->cas_ctl.tx_msg);
+	if (status < 0) {
+		dev_crit(
+			&spi->dev,
+			"status %d from spi_sync in write\n",
+			status
+		);
+	} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
+		/* ca8210 is busy */
+		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
+		ca8210_spi_writeDummy(spi);
+		up(&priv->cas_ctl.spi_sem);
+		local_irq_restore(flags);
+		return -EBUSY;
+	} else if (!dummy) {
 		spi_message_init(&priv->cas_ctl.tx_msg);
 		priv->cas_ctl.tx_msg.spi = spi;
 		priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
-		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + i;
-		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + i;
-		priv->cas_ctl.tx_transfer.delay_usecs = 200;
-		if (len-i < SPLIT_TX_LEN) {
-			priv->cas_ctl.tx_transfer.len = len - i;
-			priv->cas_ctl.tx_msg.frame_length = len - i;
-		} else {
-			priv->cas_ctl.tx_transfer.len = SPLIT_TX_LEN;
-			priv->cas_ctl.tx_msg.frame_length = SPLIT_TX_LEN;
-		}
-
-		if (!dummy) {
-			/* Regular transmission, keep CS asserted in case of
-			 * incomplete concurrent read
-			 */
-			priv->cas_ctl.tx_transfer.cs_change = 1;
-		} else {
-			/* dummy transmission, de-assert CS */
-			priv->cas_ctl.tx_transfer.cs_change = 0;
-		}
-
+		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + 1;
+		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + 1;
+		priv->cas_ctl.tx_transfer.delay_usecs = 0;
+		priv->cas_ctl.tx_transfer.len = len - 1;
+		priv->cas_ctl.tx_msg.frame_length = len - 1;
+		priv->cas_ctl.tx_transfer.cs_change = 1;
 		spi_message_add_tail(
 			&priv->cas_ctl.tx_transfer,
 			&priv->cas_ctl.tx_msg
@@ -1061,19 +1066,8 @@ static int ca8210_spi_write(
 				"status %d from spi_sync in write\n",
 				status
 			);
-		} else if (!dummy && priv->cas_ctl.tx_in_buf[0] == SPI_NACK) {
-			/* ca8210 is busy */
-			dev_info(
-				&spi->dev,
-				"ca8210 was busy during attempted write\n"
-			);
-			ca8210_spi_writeDummy(spi);
-			up(&priv->cas_ctl.spi_sem);
-			local_irq_restore(flags);
-			return -EBUSY;
 		}
 	}
-	#undef SPLIT_TX_LEN
 
 	if (dummy)
 		return status;
@@ -1203,42 +1197,77 @@ static int ca8210_spi_exchange(
 	unsigned long startjiffies, currentjiffies;
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
+	int write_retries = 0;
 
-	status = ca8210_spi_write(priv->spi, buf, len);
-
-	if (status < 0) {
-		dev_warn(&spi->dev, "spi write failed, returned %d\n", status);
-		return status;
-	}
-
-	if ((buf[0] & SPI_SYN) && response) { /* if sync wait for confirm */
+	if ((buf[0] & SPI_SYN) && response) { /* if sync lock mutex */
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
 			return -ERESTARTSYS;
 		}
-		priv->sync_command_response = response;
-		priv->sync_command_pending = true;
-		mutex_unlock(&priv->sync_command_mutex);
-		startjiffies = jiffies;
-		while (1) {
-			if (mutex_lock_interruptible(
-				&priv->sync_command_mutex)) {
-				return -ERESTARTSYS;
-			}
-			if (!priv->sync_command_pending) {
-				priv->sync_command_response = NULL;
-				mutex_unlock(&priv->sync_command_mutex);
-				break;
-			}
-			mutex_unlock(&priv->sync_command_mutex);
-			currentjiffies = jiffies;
-			if ((currentjiffies - startjiffies) >
-			    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
-				dev_err(
+	}
+
+	do {
+		status = ca8210_spi_write(priv->spi, buf, len);
+		if (status < 0) {
+			dev_warn(
+				&spi->dev,
+				"spi write failed, returned %d\n",
+				status
+			);
+			if (status == -EBUSY) {
+				mdelay(2 << write_retries);
+				write_retries++;
+				if (write_retries > 4) {
+					dev_err(
+						&spi->dev,
+						"too many retries!\n"
+					);
+					if (((buf[0] & SPI_SYN) && response)) {
+						mutex_unlock(&priv->sync_command_mutex);
+					}
+					return status;
+				}
+				dev_info(
 					&spi->dev,
-					"Synchronous confirm timeout\n"
+					"retry %d...\n",
+					write_retries
 				);
-				return -ETIME;
+			} else {
+				if (((buf[0] & SPI_SYN) && response)) {
+					mutex_unlock(&priv->sync_command_mutex);
+				}
+				return status;
 			}
+		}
+	} while (status < 0);
+
+	if (!((buf[0] & SPI_SYN) && response)) {
+		return 0;
+	}
+
+	/* if sync wait for confirm */
+	priv->sync_command_response = response;
+	priv->sync_command_pending = true;
+	mutex_unlock(&priv->sync_command_mutex);
+	startjiffies = jiffies;
+	while (1) {
+		if (mutex_lock_interruptible(
+			&priv->sync_command_mutex)) {
+			return -ERESTARTSYS;
+		}
+		if (!priv->sync_command_pending) {
+			priv->sync_command_response = NULL;
+			mutex_unlock(&priv->sync_command_mutex);
+			break;
+		}
+		mutex_unlock(&priv->sync_command_mutex);
+		currentjiffies = jiffies;
+		if ((currentjiffies - startjiffies) >
+		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
+			dev_err(
+				&spi->dev,
+				"Synchronous confirm timeout\n"
+			);
+			return -ETIME;
 		}
 	}
 
@@ -2765,8 +2794,23 @@ static ssize_t ca8210_test_int_user_write(
 	struct ca8210_priv *priv = filp->private_data;
 	uint8_t command[CA8210_SPI_BUF_SIZE];
 
-	if (copy_from_user(command, in_buf, len))
-		return 0;
+	if (len > CA8210_SPI_BUF_SIZE) {
+		dev_warn(
+			&priv->spi->dev,
+			"userspace requested erroneously long write (%d)\n",
+			len
+		);
+		return -EMSGSIZE;
+	}
+
+	ret = copy_from_user(command, in_buf, len);
+	if (ret) {
+		dev_err(
+			&priv->spi->dev,
+			"%d bytes could not be copied from userspace\n"
+		);
+		return -EIO;
+	}
 
 	ret = ca8210_test_check_upstream(command, priv->spi);
 	if (ret == 0) {
@@ -2778,7 +2822,14 @@ static ssize_t ca8210_test_int_user_write(
 		);
 		if (ret < 0) {
 			/* effectively 0 bytes were written successfully */
-			return 0;
+			dev_err(
+				&priv->spi->dev,
+				"spi exchange failed\n"
+			);
+			return ret;
+		}
+		if (command[0] & SPI_SYN) {
+			priv->sync_down++;
 		}
 	}
 
@@ -2818,7 +2869,7 @@ static ssize_t ca8210_test_int_user_read(
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
-	memcpy(buf, fifo_buffer, cmdlen + 2);
+	copy_to_user(buf, fifo_buffer, cmdlen + 2);
 
 	kfree(fifo_buffer);
 
@@ -3150,6 +3201,9 @@ error:
  */
 static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
+	flush_workqueue(priv->rx_workqueue);
+	destroy_workqueue(priv->rx_workqueue);
+
 	kfree(priv->cas_ctl.rx_buf);
 	priv->cas_ctl.rx_buf = NULL;
 	kfree(priv->cas_ctl.tx_in_buf);
@@ -3160,9 +3214,6 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_out_buf = NULL;
 	kfree(priv->cas_ctl.rx_final_buf);
 	priv->cas_ctl.rx_final_buf = NULL;
-
-	flush_workqueue(priv->rx_workqueue);
-	destroy_workqueue(priv->rx_workqueue);
 }
 
 /**
@@ -3271,13 +3322,14 @@ static int ca8210_remove(struct spi_device *spi_device)
 			ca8210_unregister_ext_clock(spi_device);
 			ca8210_config_extern_clk(pdata, spi_device, 0);
 		}
-		kfree(pdata);
 		free_irq(pdata->irq_id, spi_device->dev.driver_data);
+		kfree(pdata);
 		spi_device->dev.platform_data = NULL;
 	}
 	/* get spi_device private data */
 	priv = spi_get_drvdata(spi_device);
 	if (priv) {
+		dev_info(&spi_device->dev, "sync_down = %d, sync_up = %d\n", priv->sync_down, priv->sync_up);
 		ca8210_dev_com_clear(spi_device->dev.driver_data);
 		if (priv->hw) {
 			if (priv->hw_registered) {
@@ -3329,6 +3381,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->irq_being_serviced = false;
 	mutex_init(&priv->sync_command_mutex);
+	mutex_init(&priv->awake_mutex);
 	spi_set_drvdata(priv->spi, priv);
 
 	ca8210_test_interface_init(priv);
@@ -3402,6 +3455,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 	priv->hw_registered = true;
+	priv->sync_up = 0;
+	priv->sync_down = 0;
 
 	return 0;
 error:
