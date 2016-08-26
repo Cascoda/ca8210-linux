@@ -2794,6 +2794,9 @@ static ssize_t ca8210_test_int_user_write(
 	struct ca8210_priv *priv = filp->private_data;
 	uint8_t command[CA8210_SPI_BUF_SIZE];
 
+	if (len > CA8210_SPI_BUF_SIZE)
+		return 0;
+
 	if (copy_from_user(command, in_buf, len))
 		return 0;
 
@@ -2850,7 +2853,7 @@ static ssize_t ca8210_test_int_user_read(
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
-	memcpy(buf, fifo_buffer, cmdlen + 2);
+	copy_to_user(buf, fifo_buffer, cmdlen + 2);
 
 	kfree(fifo_buffer);
 
