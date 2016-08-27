@@ -2807,7 +2807,8 @@ static ssize_t ca8210_test_int_user_write(
 	if (ret) {
 		dev_err(
 			&priv->spi->dev,
-			"%d bytes could not be copied from userspace\n"
+			"%d bytes could not be copied from userspace\n",
+			ret
 		);
 		return -EIO;
 	}
