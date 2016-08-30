@@ -1980,7 +1980,7 @@ static int ca8210_async_xmit_complete(
 	}
 
 	if (priv->nextmsduhandle != msduhandle) {
-		dev_crit(
+		dev_err(
 			&priv->spi->dev,
 			"Unexpected msdu_handle on data confirm, " \
 			"Expected %d, got %d\n",
