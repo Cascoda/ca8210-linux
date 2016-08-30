@@ -1974,7 +1974,15 @@ static int ca8210_async_xmit_complete(
 			"Link transmission unsuccessful, status = %d\n",
 			status
 		);
-		if (status == 0xF1) {
+		if (status == MAC_TRANSACTION_OVERFLOW) {
+			dev_info(
+				&priv->spi->dev,
+				"Waiting for transaction overflow to " \
+				"stabilise...\n");
+			msleep(2000);
+			dev_info(
+				&priv->spi->dev,
+				"Resetting MAC...\n");
 			MLME_RESET_request_sync(0, priv->spi);
 		}
 	}
