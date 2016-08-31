@@ -1969,25 +1969,6 @@ static int ca8210_async_xmit_complete(
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
 
-	if (status) {
-		dev_err(
-			&priv->spi->dev,
-			"Link transmission unsuccessful, status = %d\n",
-			status
-		);
-		if (status == MAC_TRANSACTION_OVERFLOW) {
-			dev_info(
-				&priv->spi->dev,
-				"Waiting for transaction overflow to " \
-				"stabilise...\n");
-			msleep(2000);
-			dev_info(
-				&priv->spi->dev,
-				"Resetting MAC...\n");
-			MLME_RESET_request_sync(0, priv->spi);
-		}
-	}
-
 	if (priv->nextmsduhandle != msduhandle) {
 		dev_err(
 			&priv->spi->dev,
@@ -2125,6 +2106,7 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 {
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
+	uint8_t status;
 
 	dev_dbg(&priv->spi->dev, "ca8210_net_rx(), CmdID = %d\n", command[0]);
 
@@ -2145,11 +2127,30 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 		spin_unlock_irqrestore(&priv->lock, flags);
 		return ca8210_skb_rx(hw, len-2, command+2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
+		status = command[3];
+		if (status) {
+			dev_err(
+				&priv->spi->dev,
+				"Link transmission unsuccessful, status = %d\n",
+				status
+			);
+			if (status == MAC_TRANSACTION_OVERFLOW) {
+				dev_info(
+					&priv->spi->dev,
+					"Waiting for transaction overflow to " \
+					"stabilise...\n");
+				msleep(2000);
+				dev_info(
+					&priv->spi->dev,
+					"Resetting MAC...\n");
+				MLME_RESET_request_sync(0, priv->spi);
+			}
+		}
 		if (priv->async_tx_pending) {
 			return ca8210_async_xmit_complete(
 				hw,
 				command[2],
-				command[3]
+				status
 			);
 		} else if (priv->sync_tx_pending) {
 			priv->sync_tx_pending = false;
