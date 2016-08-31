@@ -706,7 +706,8 @@ static void ca8210_rx_done(struct work_struct *work)
 				mutex_unlock(&priv->sync_command_mutex);
 				dev_crit(
 					&priv->spi->dev,
-					"Sync command provided no response buffer\n"
+					"Sync command provided no response " \
+					"buffer\n"
 				);
 				return;
 			}
@@ -3341,7 +3342,12 @@ static int ca8210_remove(struct spi_device *spi_device)
 	/* get spi_device private data */
 	priv = spi_get_drvdata(spi_device);
 	if (priv) {
-		dev_info(&spi_device->dev, "sync_down = %d, sync_up = %d\n", priv->sync_down, priv->sync_up);
+		dev_info(
+			&spi_device->dev,
+			"sync_down = %d, sync_up = %d\n",
+			priv->sync_down,
+			priv->sync_up
+		);
 		ca8210_dev_com_clear(spi_device->dev.driver_data);
 		if (priv->hw) {
 			if (priv->hw_registered) {
