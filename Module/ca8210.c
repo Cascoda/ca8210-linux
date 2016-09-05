@@ -341,6 +341,7 @@ struct ca8210_test {
  * @lock:                   spinlock protecting the private data area
  * @async_tx_workqueue:     workqueue for asynchronous transmission
  * @rx_workqueue:           workqueue for receive processing
+ * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
  * @rx_work:                work object for processing a single received packet
  * @irq_work:               work object for a single irq
@@ -371,6 +372,7 @@ struct ca8210_priv {
 	bool hw_registered;
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
+	struct workqueue_struct *irq_workqueue;
 	struct work_struct async_tx_work, rx_work, irq_work;
 	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
@@ -825,7 +827,6 @@ static void ca8210_spi_finishRead(void *arg)
 	}
 
 	/* Offload rx processing to workqueue */
-	flush_work(&priv->rx_work);
 	queue_work(priv->rx_workqueue, &priv->rx_work);
 }
 
@@ -1138,7 +1139,6 @@ static int ca8210_spi_write(
 			priv->cas_ctl.tx_in_buf,
 			CA8210_SPI_BUF_SIZE
 		);
-		flush_work(&priv->rx_work);
 		queue_work(priv->rx_workqueue, &priv->rx_work);
 
 		#undef NUM_DATABYTES_SO_FAR
@@ -1295,7 +1295,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	spin_lock(&priv->lock);
 	if (!priv->irq_being_serviced) {
 		dev_dbg(&priv->spi->dev, "irq: Servicing interrupt\n");
-		queue_work(priv->rx_workqueue, &priv->irq_work);
+		queue_work(priv->irq_workqueue, &priv->irq_work);
 		priv->irq_being_serviced = true;
 	}
 	spin_unlock(&priv->lock);
@@ -3182,9 +3182,13 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->rx_workqueue = alloc_workqueue("ca8210 rx worker", 0, 2);
+	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", 0);
 	if (priv->rx_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
+	}
+	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", 0);
+	if (priv->irq_workqueue == NULL) {
+		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
 	INIT_WORK(&priv->rx_work, ca8210_rx_done);
 	INIT_WORK(&priv->irq_work, ca8210_irq_worker);
@@ -3214,6 +3218,8 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
 	flush_workqueue(priv->rx_workqueue);
 	destroy_workqueue(priv->rx_workqueue);
+	flush_workqueue(priv->irq_workqueue);
+	destroy_workqueue(priv->irq_workqueue);
 
 	kfree(priv->cas_ctl.rx_buf);
 	priv->cas_ctl.rx_buf = NULL;
