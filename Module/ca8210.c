@@ -1952,7 +1952,6 @@ static int ca8210_async_xmit_complete(
 			priv->nextmsduhandle,
 			msduhandle
 		);
-		priv->nextmsduhandle = 0;
 		return -EIO;
 	}
 
