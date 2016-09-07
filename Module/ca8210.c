@@ -63,7 +63,6 @@
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/semaphore.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
@@ -299,7 +298,7 @@
  * @rx_out_buf:           array storing bytes to present downstream during
  *                        reception
  * @rx_final_buf:         destination array for finished receive packet
- * @spi_sem:              semaphore protecting spi interface
+ * @spi_mutex:            mutex protecting spi interface
  *
  * This structure stores all the necessary data passed around during spi
  * exchange for a single device.
@@ -314,7 +313,7 @@ struct cas_control {
 	uint8_t *rx_out_buf;
 	uint8_t *rx_final_buf;
 
-	struct semaphore spi_sem;
+	struct mutex spi_mutex;
 };
 
 /**
@@ -805,7 +804,7 @@ static void ca8210_spi_finishRead(void *arg)
 
 	dev_dbg(&spi->dev, "ca8210_spi_finishRead called\n");
 
-	up(&priv->cas_ctl.spi_sem);
+	mutex_unlock(&priv->cas_ctl.spi_mutex);
 
 	spin_lock_irqsave(&priv->lock, flags);
 
@@ -860,7 +859,7 @@ static void ca8210_spi_continueRead(void *arg)
 	if ((priv->cas_ctl.rx_buf[0] == SPI_IDLE) ||
 	    (priv->cas_ctl.rx_buf[0] == SPI_NACK)) {
 		ca8210_spi_writeDummy(spi);
-		up(&priv->cas_ctl.spi_sem);
+		mutex_unlock(&priv->cas_ctl.spi_mutex);
 		return;
 	}
 
@@ -903,7 +902,7 @@ static void ca8210_spi_startRead(struct spi_device *spi)
 
 	dev_dbg(&spi->dev, "SPI read function -ca8210_spi_startRead- called\n");
 
-	if (down_interruptible(&priv->cas_ctl.spi_sem))
+	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex))
 		return;
 
 	do {
@@ -983,7 +982,7 @@ static int ca8210_spi_write(
 		 * anyway
 		 */
 		local_irq_save(flags);
-		if (down_interruptible(&priv->cas_ctl.spi_sem)) {
+		if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
 			return -ERESTARTSYS;
 		}
 	}
@@ -1042,7 +1041,7 @@ static int ca8210_spi_write(
 		/* ca8210 is busy */
 		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
 		ca8210_spi_writeDummy(spi);
-		up(&priv->cas_ctl.spi_sem);
+		mutex_unlock(&priv->cas_ctl.spi_mutex);
 		local_irq_restore(flags);
 		return -EBUSY;
 	} else if (!dummy) {
@@ -1144,7 +1143,7 @@ static int ca8210_spi_write(
 		#undef NUM_DATABYTES_SO_FAR
 	}
 	ca8210_spi_writeDummy(spi);
-	up(&priv->cas_ctl.spi_sem);
+	mutex_unlock(&priv->cas_ctl.spi_mutex);
 	local_irq_restore(flags);
 	return status;
 }
@@ -3121,7 +3120,7 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 {
 	int status;
 
-	sema_init(&priv->cas_ctl.spi_sem, 1);
+	mutex_init(&priv->cas_ctl.spi_mutex);
 
 	priv->cas_ctl.tx_buf = kmalloc(
 		CA8210_SPI_BUF_SIZE,
