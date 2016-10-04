@@ -616,6 +616,10 @@ static int ca8210_net_rx(
 	uint8_t               *command,
 	size_t                 len
 );
+static uint8_t MLME_RESET_request_sync(
+	uint8_t  set_default_pib,
+	void    *device_ref
+);
 
 /**
  * ca8210_reset_send() - Hard resets the ca8210 for a given time
@@ -725,7 +729,19 @@ static void ca8210_rx_done(struct work_struct *work)
 	}
 
 	ca8210_net_rx(priv->hw, buf, len);
-	if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
+	if (buf[0] == SPI_MCPS_DATA_CONFIRM) {
+		if (buf[3] == MAC_TRANSACTION_OVERFLOW) {
+			dev_info(
+				&priv->spi->dev,
+				"Waiting for transaction overflow to " \
+				"stabilise...\n");
+			msleep(2000);
+			dev_info(
+				&priv->spi->dev,
+				"Resetting MAC...\n");
+			MLME_RESET_request_sync(0, priv->spi);
+		}
+	} else if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
 		dev_notice(
 			&priv->spi->dev,
 			"Wakeup indication received, reason:\n"
@@ -1967,10 +1983,21 @@ static int ca8210_async_xmit_complete(
 	spin_lock_irqsave(&priv->lock, flags);
 
 	priv->async_tx_pending = false;
+	priv->nextmsduhandle++;
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	priv->nextmsduhandle++;
+	if (status) {
+		dev_err(
+			&priv->spi->dev,
+			"Link transmission unsuccessful, status = %d\n",
+			status
+		);
+		if (status != MAC_TRANSACTION_OVERFLOW) {
+			ieee802154_wake_queue(priv->hw);
+			return 0;
+		}
+	}
 	ieee802154_xmit_complete(priv->hw, priv->tx_skb, true);
 
 	return 0;
@@ -2102,24 +2129,6 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, uint8_t *command, size_t len)
 		return ca8210_skb_rx(hw, len-2, command+2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
 		status = command[3];
-		if (status) {
-			dev_err(
-				&priv->spi->dev,
-				"Link transmission unsuccessful, status = %d\n",
-				status
-			);
-			if (status == MAC_TRANSACTION_OVERFLOW) {
-				dev_info(
-					&priv->spi->dev,
-					"Waiting for transaction overflow to " \
-					"stabilise...\n");
-				msleep(2000);
-				dev_info(
-					&priv->spi->dev,
-					"Resetting MAC...\n");
-				MLME_RESET_request_sync(0, priv->spi);
-			}
-		}
 		if (priv->async_tx_pending) {
 			return ca8210_async_xmit_complete(
 				hw,
