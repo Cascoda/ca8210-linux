@@ -818,9 +818,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 
 	dev_dbg(&spi->dev, "ca8210_spi_read called\n");
 
-	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex))
-		return -ERESTARTSYS;
-
 	do {
 		spin_lock_irqsave(&priv->lock, flags);
 		if (priv->cas_ctl.rx_final_buf[0] == SPI_IDLE) {
@@ -889,10 +886,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 
 	spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
 
-	spin_lock_irqsave(&priv->lock, flags);
-	priv->irq_being_serviced = false;
-	spin_unlock_irqrestore(&priv->lock, flags);
-
 	status = spi_sync(spi, &priv->cas_ctl.rx_msg);
 
 	if (status) {
@@ -903,8 +896,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 		);
 		goto error;
 	}
-
-	mutex_unlock(&priv->cas_ctl.spi_mutex);
 
 	spin_lock_irqsave(&priv->lock, flags);
 
@@ -932,9 +923,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 error:
 	ca8210_spi_writeDummy(spi);
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
-	spin_lock_irqsave(&priv->lock, flags);
-	priv->irq_being_serviced = false;
-	spin_unlock_irqrestore(&priv->lock, flags);
 	return status;
 }
 
@@ -971,12 +959,6 @@ static int ca8210_spi_write(
 		dummy = true;
 	} else {
 		dummy = false;
-		/* Hold off on servicing interrupts, will get read during write
-		 * anyway
-		 */
-		if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
-			return -ERESTARTSYS;
-		}
 
 		/* Set in/out buffers to idle, copy over data to send */
 		memset(priv->cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -1035,7 +1017,6 @@ static int ca8210_spi_write(
 		/* ca8210 is busy */
 		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
 		ca8210_spi_writeDummy(spi);
-		mutex_unlock(&priv->cas_ctl.spi_mutex);
 		return -EBUSY;
 	} else if (!dummy) {
 		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE) {
@@ -1108,7 +1089,6 @@ static int ca8210_spi_write(
 		);
 		queue_work(priv->rx_workqueue, &priv->rx_work);
 	}
-	mutex_unlock(&priv->cas_ctl.spi_mutex);
 	return status;
 }
 
@@ -1157,15 +1137,20 @@ static int ca8210_spi_exchange(
 	void *device_ref
 )
 {
-	int status;
+	int status = 0;
 	unsigned long startjiffies, currentjiffies;
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
 	int write_retries = 0;
 
+	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
+		return -ERESTARTSYS;
+	}
+
 	if ((buf[0] & SPI_SYN) && response) { /* if sync lock mutex */
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-			return -ERESTARTSYS;
+			status = -ERESTARTSYS;
+			goto cleanup;
 		}
 	}
 
@@ -1183,7 +1168,8 @@ static int ca8210_spi_exchange(
 					if (((buf[0] & SPI_SYN) && response)) {
 						mutex_unlock(&priv->sync_command_mutex);
 					}
-					return -EAGAIN;
+					status = -EAGAIN;
+					goto cleanup;
 				}
 				dev_info(
 					&spi->dev,
@@ -1199,13 +1185,14 @@ static int ca8210_spi_exchange(
 				if (((buf[0] & SPI_SYN) && response)) {
 					mutex_unlock(&priv->sync_command_mutex);
 				}
-				return status;
+				goto cleanup;
 			}
 		}
 	} while (status < 0);
+	mutex_unlock(&priv->cas_ctl.spi_mutex);
 
 	if (!((buf[0] & SPI_SYN) && response)) {
-		return 0;
+		return status;
 	}
 
 	/* if sync wait for confirm */
@@ -1216,7 +1203,8 @@ static int ca8210_spi_exchange(
 	while (1) {
 		if (mutex_lock_interruptible(
 			&priv->sync_command_mutex)) {
-			return -ERESTARTSYS;
+			status = -ERESTARTSYS;
+			break;
 		}
 		if (!priv->sync_command_pending) {
 			priv->sync_command_response = NULL;
@@ -1231,11 +1219,15 @@ static int ca8210_spi_exchange(
 				&spi->dev,
 				"Synchronous confirm timeout\n"
 			);
-			return -ETIME;
+			status = -ETIME;
+			break;
 		}
 	}
+	return status;
 
-	return 0;
+cleanup:
+	mutex_unlock(&priv->cas_ctl.spi_mutex);
+	return status;
 }
 
 /**
@@ -1278,36 +1270,36 @@ static void ca8210_irq_worker(struct work_struct *work)
 		struct ca8210_priv,
 		irq_work
 	);
-	int status, read_retries = 0;
+	int status;
+	unsigned long flags;
 
+	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
+		spin_lock_irqsave(&priv->lock, flags);
+		priv->irq_being_serviced = false;
+		spin_unlock_irqrestore(&priv->lock, flags);
+		return;
+	}
 	do {
 		status = ca8210_spi_read(priv->spi);
 		if (status < 0) {
 			if (status == -EBUSY) {
-				msleep(1);
-				read_retries++;
-				if (read_retries > 100) {
-					dev_err(
-						&priv->spi->dev,
-						"too many retries!\n"
-					);
-					return;
-				}
-				dev_info(
-					&priv->spi->dev,
-					"spi read retry %d...\n",
-					read_retries
-				);
+				goto cleanup;
 			} else {
 				dev_warn(
 					&priv->spi->dev,
 					"spi read failed, returned %d\n",
 					status
 				);
-				return;
+				goto cleanup;
 			}
 		}
 	} while (status < 0);
+
+cleanup:
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->irq_being_serviced = false;
+	spin_unlock_irqrestore(&priv->lock, flags);
+	mutex_unlock(&priv->cas_ctl.spi_mutex);
 }
 
 /******************************************************************************/
