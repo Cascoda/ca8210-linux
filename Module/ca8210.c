@@ -342,7 +342,6 @@ struct ca8210_test {
  * @rx_workqueue:           workqueue for receive processing
  * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
- * @irq_work:               work object for a single irq
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
  *                           transmission timeout
  * @tx_skb:                 current socket buffer to transmit
@@ -371,7 +370,7 @@ struct ca8210_priv {
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
 	struct workqueue_struct *irq_workqueue;
-	struct work_struct async_tx_work, irq_work;
+	struct work_struct async_tx_work;
 	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
 	uint8_t nextmsduhandle;
@@ -1236,41 +1235,22 @@ cleanup:
 }
 
 /**
- * ca8210_interrupt_handler() - Called when an irq is received from the ca8210
- * @irq:     Id of the irq being handled
- * @dev_id:  Pointer passed by the system, pointing to the ca8210's private data
- *
- * This function is called when the irq line from the ca8210 is asserted,
- * signifying that the ca8210 has a message to send upstream to us. Queues the
- * work of reading this message to be executed in non-atomic context.
- *
- * Return: irq return code
- */
-static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
-{
-	struct ca8210_priv *priv = dev_id;
-
-	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
-	queue_work(priv->irq_workqueue, &priv->irq_work);
-	return IRQ_HANDLED;
-}
-
-/**
  * ca8210_irq_worker() - Starts the spi read process after having the work
  *                       handed off by the interrupt handler
  * @work:  Pointer to work being executed
  */
 static void ca8210_irq_worker(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(
+	struct work_priv_container *wpc = container_of(
 		work,
-		struct ca8210_priv,
-		irq_work
+		struct work_priv_container,
+		work
 	);
+	struct ca8210_priv *priv = wpc->priv;
 	int status;
-	unsigned long flags;
 
 	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
+		kfree(wpc);
 		return;
 	}
 	do {
@@ -1291,6 +1271,34 @@ static void ca8210_irq_worker(struct work_struct *work)
 
 cleanup:
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
+	kfree(wpc);
+}
+
+/**
+ * ca8210_interrupt_handler() - Called when an irq is received from the ca8210
+ * @irq:     Id of the irq being handled
+ * @dev_id:  Pointer passed by the system, pointing to the ca8210's private data
+ *
+ * This function is called when the irq line from the ca8210 is asserted,
+ * signifying that the ca8210 has a message to send upstream to us. Queues the
+ * work of reading this message to be executed in non-atomic context.
+ *
+ * Return: irq return code
+ */
+static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
+{
+	struct ca8210_priv *priv = dev_id;
+	struct work_priv_container *irq_wpc;
+
+	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
+	irq_wpc = kmalloc(
+		sizeof(struct work_priv_container),
+		GFP_KERNEL
+	);
+	INIT_WORK(&irq_wpc->work, ca8210_irq_worker);
+	irq_wpc->priv = priv;
+	queue_work(priv->irq_workqueue, &irq_wpc->work);
+	return IRQ_HANDLED;
 }
 
 /******************************************************************************/
@@ -3156,7 +3164,6 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
-	INIT_WORK(&priv->irq_work, ca8210_irq_worker);
 
 	return 0;
 
