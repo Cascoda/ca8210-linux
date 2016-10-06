@@ -362,7 +362,7 @@ struct ca8210_test {
  *                           response
  * @sync_command_mutex:     mutex controlling access to sync command objects
  * @sync_command_response:  pointer to buffer to fill with sync response
- * @ca8210_is_awake:        true if ca8210 is initialised, ready for comms
+ * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  *
  */
 struct ca8210_priv {
@@ -384,10 +384,9 @@ struct ca8210_priv {
 	bool sync_command_pending;
 	struct mutex sync_command_mutex;
 	uint8_t *sync_command_response;
-	bool ca8210_is_awake;
+	atomic_t ca8210_is_awake;
 	bool irq_being_serviced;
 	int sync_down, sync_up;
-	struct mutex awake_mutex;
 };
 
 /**
@@ -635,18 +634,14 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 	#define RESET_OFF 0
 	#define RESET_ON 1
 
-	if (mutex_lock_interruptible(&priv->awake_mutex)) {
-		return;
-	}
-
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
-	priv->ca8210_is_awake = false;
+	atomic_set(&priv->ca8210_is_awake, 0);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, RESET_ON);
 
 	/* Wait until wakeup indication seen */
 	startjiffies = jiffies;
-	while (!priv->ca8210_is_awake) {
+	while (atomic_read(&priv->ca8210_is_awake) == 0) {
 		if (jiffies - startjiffies >
 		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
 			dev_crit(
@@ -655,11 +650,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 			);
 			break;
 		}
-		mutex_unlock(&priv->awake_mutex);
 		msleep(1);
-		if (mutex_lock_interruptible(&priv->awake_mutex)) {
-			return;
-		}
 	}
 
 	dev_dbg(&spi->dev, "Reset the device\n");
@@ -798,7 +789,7 @@ static void ca8210_rx_done(struct work_struct *work)
 			break;
 		}
 		spin_lock_irqsave(&priv->lock, flags);
-		priv->ca8210_is_awake = true;
+		atomic_inc(&priv->ca8210_is_awake);
 		spin_unlock_irqrestore(&priv->lock, flags);
 	}
 }
@@ -3381,7 +3372,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->irq_being_serviced = false;
 	mutex_init(&priv->sync_command_mutex);
-	mutex_init(&priv->awake_mutex);
+	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
 
 	ca8210_test_interface_init(priv);
