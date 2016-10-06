@@ -875,13 +875,10 @@ static int ca8210_spi_read(struct spi_device *spi)
 	priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
 
 	spi_message_init(&priv->cas_ctl.rx_msg);
-	priv->cas_ctl.rx_msg.spi = spi;
-	priv->cas_ctl.rx_msg.is_dma_mapped = false;
 
 	priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
 	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
 	priv->cas_ctl.rx_transfer.len = priv->cas_ctl.rx_final_buf[1];
-	// priv->cas_ctl.rx_msg.frame_length = priv->cas_ctl.rx_final_buf[1];
 	priv->cas_ctl.rx_transfer.cs_change = 0;
 	priv->cas_ctl.rx_transfer.delay_usecs = 0;
 
@@ -988,8 +985,6 @@ static int ca8210_spi_write(
 	}
 
 	spi_message_init(&priv->cas_ctl.tx_msg);
-	priv->cas_ctl.tx_msg.spi = spi;
-	priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
 	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
 	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
@@ -1050,8 +1045,6 @@ static int ca8210_spi_write(
 				priv->cas_ctl.tx_in_buf[1];
 		}
 		spi_message_init(&priv->cas_ctl.tx_msg);
-		priv->cas_ctl.tx_msg.spi = spi;
-		priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
 		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + 2;
 		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + 2;
