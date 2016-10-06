@@ -1020,7 +1020,8 @@ static int ca8210_spi_write(
 		ca8210_spi_writeDummy(spi);
 		return -EBUSY;
 	} else if (!dummy) {
-		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE) {
+		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
+		    priv->cas_ctl.tx_in_buf[0] != SPI_NACK) {
 			duplex_rx = true;
 			do {
 				spin_lock_irqsave(&priv->lock, flags);
