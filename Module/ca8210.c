@@ -385,7 +385,6 @@ struct ca8210_priv {
 	struct mutex sync_command_mutex;
 	uint8_t *sync_command_response;
 	atomic_t ca8210_is_awake;
-	bool irq_being_serviced;
 	int sync_down, sync_up;
 };
 
@@ -1252,15 +1251,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	struct ca8210_priv *priv = dev_id;
 
 	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
-
-	spin_lock(&priv->lock);
-	if (!priv->irq_being_serviced) {
-		dev_dbg(&priv->spi->dev, "irq: Servicing interrupt\n");
-		queue_work(priv->irq_workqueue, &priv->irq_work);
-		priv->irq_being_serviced = true;
-	}
-	spin_unlock(&priv->lock);
-
+	queue_work(priv->irq_workqueue, &priv->irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1280,9 +1271,6 @@ static void ca8210_irq_worker(struct work_struct *work)
 	unsigned long flags;
 
 	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
-		spin_lock_irqsave(&priv->lock, flags);
-		priv->irq_being_serviced = false;
-		spin_unlock_irqrestore(&priv->lock, flags);
 		return;
 	}
 	do {
@@ -1302,9 +1290,6 @@ static void ca8210_irq_worker(struct work_struct *work)
 	} while (status < 0);
 
 cleanup:
-	spin_lock_irqsave(&priv->lock, flags);
-	priv->irq_being_serviced = false;
-	spin_unlock_irqrestore(&priv->lock, flags);
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
 }
 
@@ -3385,7 +3370,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
-	priv->irq_being_serviced = false;
 	mutex_init(&priv->sync_command_mutex);
 	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
