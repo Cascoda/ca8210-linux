@@ -3468,6 +3468,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	return 0;
 error:
+	msleep(100); /* wait for pending spi transfers to complete */
 	ca8210_remove(spi_device);
 	return link_to_linux_err(ret);
 }
