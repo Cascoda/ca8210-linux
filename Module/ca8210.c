@@ -926,7 +926,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 
 error:
 	ca8210_spi_writeDummy(spi);
-	mutex_unlock(&priv->cas_ctl.spi_mutex);
 	return status;
 }
 
