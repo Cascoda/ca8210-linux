@@ -342,7 +342,6 @@ struct ca8210_test {
  * @rx_workqueue:           workqueue for receive processing
  * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
- * @rx_work:                work object for processing a single received packet
  * @irq_work:               work object for a single irq
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
  *                           transmission timeout
@@ -372,7 +371,7 @@ struct ca8210_priv {
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
 	struct workqueue_struct *irq_workqueue;
-	struct work_struct async_tx_work, rx_work, irq_work;
+	struct work_struct async_tx_work, irq_work;
 	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
 	uint8_t nextmsduhandle;
@@ -3157,7 +3156,6 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
-	INIT_WORK(&priv->rx_work, ca8210_rx_done);
 	INIT_WORK(&priv->irq_work, ca8210_irq_worker);
 
 	return 0;
