@@ -389,6 +389,11 @@ struct ca8210_priv {
 	int sync_down, sync_up;
 };
 
+struct work_priv_container {
+	struct work_struct work;
+	struct ca8210_priv *priv;
+};
+
 /**
  * struct ca8210_platform_data - ca8210 platform data structure
  * @extclockfreq:  frequency of the external clock
@@ -668,11 +673,12 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
  */
 static void ca8210_rx_done(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(
+	struct work_priv_container *wpc = container_of(
 		work,
-		struct ca8210_priv,
-		rx_work
+		struct work_priv_container,
+		work
 	);
+	struct ca8210_priv *priv = wpc->priv;
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
@@ -694,7 +700,7 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	if (buf[0] & SPI_SYN) {
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-			return;
+			goto cleanup;
 		}
 		if (priv->sync_command_pending) {
 			if (priv->sync_command_response == NULL) {
@@ -705,7 +711,7 @@ static void ca8210_rx_done(struct work_struct *work)
 					"Sync command provided no response " \
 					"buffer\n"
 				);
-				return;
+				goto cleanup;
 			}
 			memcpy(priv->sync_command_response, buf, len);
 			priv->sync_command_pending = false;
@@ -792,6 +798,9 @@ static void ca8210_rx_done(struct work_struct *work)
 		atomic_inc(&priv->ca8210_is_awake);
 		spin_unlock_irqrestore(&priv->lock, flags);
 	}
+
+cleanup:
+	kfree(wpc);
 }
 
 /**
@@ -806,6 +815,7 @@ static int ca8210_spi_read(struct spi_device *spi)
 	int status, i;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
+	struct work_priv_container *rx_wpc;
 
 	dev_dbg(&spi->dev, "ca8210_spi_read called\n");
 
@@ -908,7 +918,13 @@ static int ca8210_spi_read(struct spi_device *spi)
 	}
 
 	/* Offload rx processing to workqueue */
-	queue_work(priv->rx_workqueue, &priv->rx_work);
+	rx_wpc = kmalloc(
+		sizeof(struct work_priv_container),
+		GFP_KERNEL
+	);
+	INIT_WORK(&rx_wpc->work, ca8210_rx_done);
+	rx_wpc->priv = priv;
+	queue_work(priv->rx_workqueue, &rx_wpc->work);
 	return 0;
 
 error:
@@ -937,6 +953,7 @@ static int ca8210_spi_write(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	int payload_len = 0;
+	struct work_priv_container *rx_wpc;
 
 	if (spi == NULL) {
 		dev_crit(
@@ -1078,7 +1095,13 @@ static int ca8210_spi_write(
 			priv->cas_ctl.tx_in_buf + 2,
 			priv->cas_ctl.rx_final_buf[1]
 		);
-		queue_work(priv->rx_workqueue, &priv->rx_work);
+		rx_wpc = kmalloc(
+			sizeof(struct work_priv_container),
+			GFP_KERNEL
+		);
+		INIT_WORK(&rx_wpc->work, ca8210_rx_done);
+		rx_wpc->priv = priv;
+		queue_work(priv->rx_workqueue, &rx_wpc->work);
 	}
 	return status;
 }
@@ -3148,11 +3171,11 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", 0);
+	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", WQ_UNBOUND);
 	if (priv->rx_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
 	}
-	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", 0);
+	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", WQ_UNBOUND);
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
