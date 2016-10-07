@@ -342,8 +342,6 @@ struct ca8210_test {
  * @rx_workqueue:           workqueue for receive processing
  * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
- * @rx_work:                work object for processing a single received packet
- * @irq_work:               work object for a single irq
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
  *                           transmission timeout
  * @tx_skb:                 current socket buffer to transmit
@@ -362,7 +360,7 @@ struct ca8210_test {
  *                           response
  * @sync_command_mutex:     mutex controlling access to sync command objects
  * @sync_command_response:  pointer to buffer to fill with sync response
- * @ca8210_is_awake:        true if ca8210 is initialised, ready for comms
+ * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  *
  */
 struct ca8210_priv {
@@ -372,7 +370,7 @@ struct ca8210_priv {
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
 	struct workqueue_struct *irq_workqueue;
-	struct work_struct async_tx_work, rx_work, irq_work;
+	struct work_struct async_tx_work;
 	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
 	uint8_t nextmsduhandle;
@@ -384,10 +382,13 @@ struct ca8210_priv {
 	bool sync_command_pending;
 	struct mutex sync_command_mutex;
 	uint8_t *sync_command_response;
-	bool ca8210_is_awake;
-	bool irq_being_serviced;
+	atomic_t ca8210_is_awake;
 	int sync_down, sync_up;
-	struct mutex awake_mutex;
+};
+
+struct work_priv_container {
+	struct work_struct work;
+	struct ca8210_priv *priv;
 };
 
 /**
@@ -635,18 +636,14 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 	#define RESET_OFF 0
 	#define RESET_ON 1
 
-	if (mutex_lock_interruptible(&priv->awake_mutex)) {
-		return;
-	}
-
 	gpio_set_value(pdata->gpio_reset, RESET_OFF);
-	priv->ca8210_is_awake = false;
+	atomic_set(&priv->ca8210_is_awake, 0);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, RESET_ON);
 
 	/* Wait until wakeup indication seen */
 	startjiffies = jiffies;
-	while (!priv->ca8210_is_awake) {
+	while (atomic_read(&priv->ca8210_is_awake) == 0) {
 		if (jiffies - startjiffies >
 		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
 			dev_crit(
@@ -655,11 +652,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 			);
 			break;
 		}
-		mutex_unlock(&priv->awake_mutex);
 		msleep(1);
-		if (mutex_lock_interruptible(&priv->awake_mutex)) {
-			return;
-		}
 	}
 
 	dev_dbg(&spi->dev, "Reset the device\n");
@@ -677,11 +670,12 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
  */
 static void ca8210_rx_done(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(
+	struct work_priv_container *wpc = container_of(
 		work,
-		struct ca8210_priv,
-		rx_work
+		struct work_priv_container,
+		work
 	);
+	struct ca8210_priv *priv = wpc->priv;
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
@@ -703,7 +697,7 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	if (buf[0] & SPI_SYN) {
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-			return;
+			goto cleanup;
 		}
 		if (priv->sync_command_pending) {
 			if (priv->sync_command_response == NULL) {
@@ -714,7 +708,7 @@ static void ca8210_rx_done(struct work_struct *work)
 					"Sync command provided no response " \
 					"buffer\n"
 				);
-				return;
+				goto cleanup;
 			}
 			memcpy(priv->sync_command_response, buf, len);
 			priv->sync_command_pending = false;
@@ -798,9 +792,12 @@ static void ca8210_rx_done(struct work_struct *work)
 			break;
 		}
 		spin_lock_irqsave(&priv->lock, flags);
-		priv->ca8210_is_awake = true;
+		atomic_inc(&priv->ca8210_is_awake);
 		spin_unlock_irqrestore(&priv->lock, flags);
 	}
+
+cleanup:
+	kfree(wpc);
 }
 
 /**
@@ -815,6 +812,7 @@ static int ca8210_spi_read(struct spi_device *spi)
 	int status, i;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
+	struct work_priv_container *rx_wpc;
 
 	dev_dbg(&spi->dev, "ca8210_spi_read called\n");
 
@@ -874,13 +872,10 @@ static int ca8210_spi_read(struct spi_device *spi)
 	priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
 
 	spi_message_init(&priv->cas_ctl.rx_msg);
-	priv->cas_ctl.rx_msg.spi = spi;
-	priv->cas_ctl.rx_msg.is_dma_mapped = false;
 
 	priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
 	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
 	priv->cas_ctl.rx_transfer.len = priv->cas_ctl.rx_final_buf[1];
-	// priv->cas_ctl.rx_msg.frame_length = priv->cas_ctl.rx_final_buf[1];
 	priv->cas_ctl.rx_transfer.cs_change = 0;
 	priv->cas_ctl.rx_transfer.delay_usecs = 0;
 
@@ -917,12 +912,17 @@ static int ca8210_spi_read(struct spi_device *spi)
 	}
 
 	/* Offload rx processing to workqueue */
-	queue_work(priv->rx_workqueue, &priv->rx_work);
+	rx_wpc = kmalloc(
+		sizeof(struct work_priv_container),
+		GFP_KERNEL
+	);
+	INIT_WORK(&rx_wpc->work, ca8210_rx_done);
+	rx_wpc->priv = priv;
+	queue_work(priv->rx_workqueue, &rx_wpc->work);
 	return 0;
 
 error:
 	ca8210_spi_writeDummy(spi);
-	mutex_unlock(&priv->cas_ctl.spi_mutex);
 	return status;
 }
 
@@ -946,6 +946,7 @@ static int ca8210_spi_write(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	int payload_len = 0;
+	struct work_priv_container *rx_wpc;
 
 	if (spi == NULL) {
 		dev_crit(
@@ -980,8 +981,6 @@ static int ca8210_spi_write(
 	}
 
 	spi_message_init(&priv->cas_ctl.tx_msg);
-	priv->cas_ctl.tx_msg.spi = spi;
-	priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
 	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
 	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
@@ -1019,7 +1018,8 @@ static int ca8210_spi_write(
 		ca8210_spi_writeDummy(spi);
 		return -EBUSY;
 	} else if (!dummy) {
-		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE) {
+		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
+		    priv->cas_ctl.tx_in_buf[0] != SPI_NACK) {
 			duplex_rx = true;
 			do {
 				spin_lock_irqsave(&priv->lock, flags);
@@ -1042,8 +1042,6 @@ static int ca8210_spi_write(
 				priv->cas_ctl.tx_in_buf[1];
 		}
 		spi_message_init(&priv->cas_ctl.tx_msg);
-		priv->cas_ctl.tx_msg.spi = spi;
-		priv->cas_ctl.tx_msg.is_dma_mapped = false;
 
 		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + 2;
 		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + 2;
@@ -1087,7 +1085,13 @@ static int ca8210_spi_write(
 			priv->cas_ctl.tx_in_buf + 2,
 			priv->cas_ctl.rx_final_buf[1]
 		);
-		queue_work(priv->rx_workqueue, &priv->rx_work);
+		rx_wpc = kmalloc(
+			sizeof(struct work_priv_container),
+			GFP_KERNEL
+		);
+		INIT_WORK(&rx_wpc->work, ca8210_rx_done);
+		rx_wpc->priv = priv;
+		queue_work(priv->rx_workqueue, &rx_wpc->work);
 	}
 	return status;
 }
@@ -1231,52 +1235,22 @@ cleanup:
 }
 
 /**
- * ca8210_interrupt_handler() - Called when an irq is received from the ca8210
- * @irq:     Id of the irq being handled
- * @dev_id:  Pointer passed by the system, pointing to the ca8210's private data
- *
- * This function is called when the irq line from the ca8210 is asserted,
- * signifying that the ca8210 has a message to send upstream to us. Queues the
- * work of reading this message to be executed in non-atomic context.
- *
- * Return: irq return code
- */
-static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
-{
-	struct ca8210_priv *priv = dev_id;
-
-	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
-
-	spin_lock(&priv->lock);
-	if (!priv->irq_being_serviced) {
-		dev_dbg(&priv->spi->dev, "irq: Servicing interrupt\n");
-		queue_work(priv->irq_workqueue, &priv->irq_work);
-		priv->irq_being_serviced = true;
-	}
-	spin_unlock(&priv->lock);
-
-	return IRQ_HANDLED;
-}
-
-/**
  * ca8210_irq_worker() - Starts the spi read process after having the work
  *                       handed off by the interrupt handler
  * @work:  Pointer to work being executed
  */
 static void ca8210_irq_worker(struct work_struct *work)
 {
-	struct ca8210_priv *priv = container_of(
+	struct work_priv_container *wpc = container_of(
 		work,
-		struct ca8210_priv,
-		irq_work
+		struct work_priv_container,
+		work
 	);
+	struct ca8210_priv *priv = wpc->priv;
 	int status;
-	unsigned long flags;
 
 	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
-		spin_lock_irqsave(&priv->lock, flags);
-		priv->irq_being_serviced = false;
-		spin_unlock_irqrestore(&priv->lock, flags);
+		kfree(wpc);
 		return;
 	}
 	do {
@@ -1296,10 +1270,35 @@ static void ca8210_irq_worker(struct work_struct *work)
 	} while (status < 0);
 
 cleanup:
-	spin_lock_irqsave(&priv->lock, flags);
-	priv->irq_being_serviced = false;
-	spin_unlock_irqrestore(&priv->lock, flags);
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
+	kfree(wpc);
+}
+
+/**
+ * ca8210_interrupt_handler() - Called when an irq is received from the ca8210
+ * @irq:     Id of the irq being handled
+ * @dev_id:  Pointer passed by the system, pointing to the ca8210's private data
+ *
+ * This function is called when the irq line from the ca8210 is asserted,
+ * signifying that the ca8210 has a message to send upstream to us. Queues the
+ * work of reading this message to be executed in non-atomic context.
+ *
+ * Return: irq return code
+ */
+static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
+{
+	struct ca8210_priv *priv = dev_id;
+	struct work_priv_container *irq_wpc;
+
+	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
+	irq_wpc = kmalloc(
+		sizeof(struct work_priv_container),
+		GFP_KERNEL
+	);
+	INIT_WORK(&irq_wpc->work, ca8210_irq_worker);
+	irq_wpc->priv = priv;
+	queue_work(priv->irq_workqueue, &irq_wpc->work);
+	return IRQ_HANDLED;
 }
 
 /******************************************************************************/
@@ -3157,16 +3156,14 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", 0);
+	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", WQ_UNBOUND);
 	if (priv->rx_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
 	}
-	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", 0);
+	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", WQ_UNBOUND);
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
-	INIT_WORK(&priv->rx_work, ca8210_rx_done);
-	INIT_WORK(&priv->irq_work, ca8210_irq_worker);
 
 	return 0;
 
@@ -3376,9 +3373,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
-	priv->irq_being_serviced = false;
 	mutex_init(&priv->sync_command_mutex);
-	mutex_init(&priv->awake_mutex);
+	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
 
 	ca8210_test_interface_init(priv);
@@ -3459,6 +3455,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	return 0;
 error:
+	msleep(100); /* wait for pending spi transfers to complete */
 	ca8210_remove(spi_device);
 	return link_to_linux_err(ret);
 }
