@@ -2984,7 +2984,7 @@ static int ca8210_register_ext_clock(struct spi_device *spi)
 	priv->clk = clk_register_fixed_rate(&spi->dev,
 	                                    np->name,
 	                                    NULL,
-	                                    CLK_IS_ROOT,
+	                                    0,
 	                                    pdata->extclockfreq);
 
 	if (IS_ERR(priv->clk)) {
