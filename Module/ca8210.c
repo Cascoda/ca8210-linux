@@ -318,14 +318,10 @@ struct cas_control {
 
 /**
  * struct ca8210_test - ca8210 test interface structure
- * @char_dev_num:   device id number
- * @char_dev_cdev:  device object for this char driver
- * @cl:             class of this device
- * @de:
- * @up_fifo:        fifo for upstream messages
+ * @ca8210_dfs_spi_int: pointer to the entry in the debug fs for this device
+ * @up_fifo:            fifo for upstream messages
  *
- * This structure stores all the data pertaining to the test file interface and
- * char driver.
+ * This structure stores all the data pertaining to the debug interface
  */
 struct ca8210_test {
 	struct dentry *ca8210_dfs_spi_int;
@@ -361,6 +357,8 @@ struct ca8210_test {
  * @sync_command_mutex:     mutex controlling access to sync command objects
  * @sync_command_response:  pointer to buffer to fill with sync response
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
+ * @sync_down:              counts number of downstream synchronous commands
+ * @sync_up:                counts number of upstream synchronous commands
  *
  */
 struct ca8210_priv {
@@ -386,6 +384,13 @@ struct ca8210_priv {
 	int sync_down, sync_up;
 };
 
+/**
+ * struct work_priv_container - link between a work object and the relevant
+ *                              device's private data
+ * @work: work object being executed
+ * @priv: device's private data section
+ *
+ */
 struct work_priv_container {
 	struct work_struct work;
 	struct ca8210_priv *priv;
@@ -393,12 +398,12 @@ struct work_priv_container {
 
 /**
  * struct ca8210_platform_data - ca8210 platform data structure
- * @extclockfreq:  frequency of the external clock
- * @extclockgpio:  ca8210 output gpio of the external clock
- * @registerclk:   true if the external clock should be registered
- * @gpio_reset:    gpio number of ca8210 reset line
- * @gpio_irq:      gpio number of ca8210 interrupt line
- * @irq_id:        identifier for the ca8210 irq
+ * @extclockenable: true if the external clock is to be enabled
+ * @extclockfreq:   frequency of the external clock
+ * @extclockgpio:   ca8210 output gpio of the external clock
+ * @gpio_reset:     gpio number of ca8210 reset line
+ * @gpio_irq:       gpio number of ca8210 interrupt line
+ * @irq_id:         identifier for the ca8210 irq
  *
  */
 struct ca8210_platform_data {
@@ -410,17 +415,38 @@ struct ca8210_platform_data {
 	int irq_id;
 };
 
+/**
+ * struct fulladdr - full MAC addressing information structure
+ * @mode:    address mode (none, short, extended)
+ * @pan_id:  16-bit LE pan id
+ * @address: LE address, variable length as specified by mode
+ *
+ */
 struct fulladdr {
 	uint8_t         mode;
 	uint8_t         pan_id[2];
 	uint8_t         address[8];
 };
 
+/**
+ * union macaddr: generic MAC address container
+ * @short_addr:   16-bit short address
+ * @ieee_address: 64-bit extended address as LE byte array
+ *
+ */
 union macaddr {
 	uint16_t        short_address;
 	uint8_t         ieee_address[8];
 };
 
+/**
+ * struct secspec: security specification for SAP commands
+ * @security_level: 0-7, controls level of authentication & encryption
+ * @key_id_mode:    0-3, specifies how to obtain key
+ * @key_source:     extended key retrieval data
+ * @key_index:      single-byte key identifier
+ *
+ */
 struct secspec {
 	uint8_t         security_level;
 	uint8_t         key_id_mode;
@@ -663,7 +689,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 /**
  * ca8210_rx_done() - Calls various message dispatches responding to a received
  *                    command
- * @arg:  Pointer to work being executed
+ * @work:  Pointer to work being executed
  *
  * Presents a received SAP command from the ca8210 to the Cascoda EVBME, test
  * interface and network driver.
@@ -1106,7 +1132,7 @@ static int ca8210_spi_write(
  * individual bytes of messages. Using the current spi framework the only way to
  * toggle the chip select is through an spi transfer so this functions writes
  * an "IDLE" 0xFF byte to the ca8210 for the sole purpose of de-asserting the
- * chip select when the write has finished.
+ * chip select when an exchange is complete.
  *
  * Return: 0 or linux error code
  */
