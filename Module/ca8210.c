@@ -1160,37 +1160,38 @@ static int ca8210_spi_exchange(
 
 	do {
 		status = ca8210_spi_write(priv->spi, buf, len);
-		if (status < 0) {
-			if (status == -EBUSY) {
-				msleep(1);
-				write_retries++;
-				if (write_retries > 100) {
-					dev_err(
-						&spi->dev,
-						"too many retries!\n"
-					);
-					if (((buf[0] & SPI_SYN) && response)) {
-						mutex_unlock(&priv->sync_command_mutex);
-					}
-					status = -EAGAIN;
-					goto cleanup;
-				}
-				dev_info(
+		if (status >= 0) {
+			continue;
+		}
+		if (status == -EBUSY) {
+			msleep(1);
+			write_retries++;
+			if (write_retries > 100) {
+				dev_err(
 					&spi->dev,
-					"spi write retry %d...\n",
-					write_retries
-				);
-			} else {
-				dev_warn(
-					&spi->dev,
-					"spi write failed, returned %d\n",
-					status
+					"too many retries!\n"
 				);
 				if (((buf[0] & SPI_SYN) && response)) {
 					mutex_unlock(&priv->sync_command_mutex);
 				}
+				status = -EAGAIN;
 				goto cleanup;
 			}
+			dev_info(
+				&spi->dev,
+				"spi write retry %d...\n",
+				write_retries
+			);
+		} else {
+			dev_warn(
+				&spi->dev,
+				"spi write failed, returned %d\n",
+				status
+			);
+			if (((buf[0] & SPI_SYN) && response)) {
+				mutex_unlock(&priv->sync_command_mutex);
+			}
+			goto cleanup;
 		}
 	} while (status < 0);
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
@@ -3156,11 +3157,17 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->rx_workqueue = alloc_ordered_workqueue("ca8210 rx worker", WQ_UNBOUND);
+	priv->rx_workqueue = alloc_ordered_workqueue(
+		"ca8210 rx worker",
+		WQ_UNBOUND
+	);
 	if (priv->rx_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
 	}
-	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", WQ_UNBOUND);
+	priv->irq_workqueue = alloc_ordered_workqueue(
+		"ca8210 irq worker",
+		WQ_UNBOUND
+	);
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
