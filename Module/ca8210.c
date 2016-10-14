@@ -382,6 +382,7 @@ struct ca8210_priv {
 	uint8_t *sync_command_response;
 	atomic_t ca8210_is_awake;
 	int sync_down, sync_up;
+	int spi_errno;
 };
 
 /**
@@ -1174,6 +1175,7 @@ static int ca8210_spi_exchange(
 	int write_retries = 0;
 
 	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
+		priv->spi_errno = status;
 		return -ERESTARTSYS;
 	}
 
@@ -1223,6 +1225,7 @@ static int ca8210_spi_exchange(
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
 
 	if (!((buf[0] & SPI_SYN) && response)) {
+		priv->spi_errno = status;
 		return status;
 	}
 
@@ -1254,10 +1257,12 @@ static int ca8210_spi_exchange(
 			break;
 		}
 	}
+	priv->spi_errno = status;
 	return status;
 
 cleanup:
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
+	priv->spi_errno = status;
 	return status;
 }
 
@@ -2236,6 +2241,13 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 			ret
 		);
 		/* retry transmission higher up */
+		if (priv->spi_errno == -EAGAIN) {
+			dev_crit(
+				&priv->spi->dev,
+				"CA8210 CONSTANTLY NACKING!\n"
+			);
+			return;
+		}
 		ieee802154_wake_queue(priv->hw);
 		return;
 	}
