@@ -1320,7 +1320,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
 	irq_wpc = kmalloc(
 		sizeof(struct work_priv_container),
-		GFP_KERNEL
+		GFP_ATOMIC
 	);
 	INIT_WORK(&irq_wpc->work, ca8210_irq_worker);
 	irq_wpc->priv = priv;
@@ -2232,7 +2232,7 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 	if (ret < 0) {
 		dev_warn(
 			&priv->spi->dev,
-			"Failed to transmit skb, returned %d",
+			"Failed to transmit skb, returned %d\n",
 			ret
 		);
 		/* retry transmission higher up */
