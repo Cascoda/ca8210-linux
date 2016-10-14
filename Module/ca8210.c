@@ -2232,7 +2232,7 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 	if (ret < 0) {
 		dev_warn(
 			&priv->spi->dev,
-			"Failed to transmit skb, returned %d",
+			"Failed to transmit skb, returned %d\n",
 			ret
 		);
 		/* retry transmission higher up */
