@@ -1320,7 +1320,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	dev_dbg(&priv->spi->dev, "irq: Interrupt occured\n");
 	irq_wpc = kmalloc(
 		sizeof(struct work_priv_container),
-		GFP_KERNEL
+		GFP_ATOMIC
 	);
 	INIT_WORK(&irq_wpc->work, ca8210_irq_worker);
 	irq_wpc->priv = priv;
