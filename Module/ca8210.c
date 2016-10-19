@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Cascoda
+ * Copyright (c) 2016, Cascoda, Ltd.
  * All rights reserved.
  *
  * This code is dual-licensed under both GPLv2 and 3-clause BSD. What follows is
