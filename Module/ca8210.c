@@ -2907,11 +2907,21 @@ static ssize_t ca8210_test_int_user_read(
 	return cmdlen+2;
 }
 
+static int ca8210_test_int_ioctl(
+	struct file *file,
+	unsigned int ioctl_num,
+	unsigned long ioctl_param
+)
+{
+	return 0;
+}
+
 static const struct file_operations test_int_fops = {
-	.read =     ca8210_test_int_user_read,
-	.write =    ca8210_test_int_user_write,
-	.open =     ca8210_test_int_open,
-	.release =  NULL
+	.read =           ca8210_test_int_user_read,
+	.write =          ca8210_test_int_user_write,
+	.open =           ca8210_test_int_open,
+	.release =        NULL,
+	.unlocked_ioctl = ca8210_test_int_ioctl
 };
 
 /******************************************************************************/
