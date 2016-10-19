@@ -522,6 +522,12 @@ struct mac_message {
 	} pdata;
 };
 
+static int (*cascoda_api_upstream)(
+	const uint8_t *buf,
+	size_t len,
+	void *device_ref
+);
+
 /**
  * link_to_linux_err() - Translates an 802.15.4 return code into the closest
  *                       linux error
@@ -735,11 +741,13 @@ static void ca8210_rx_done(struct work_struct *work)
 			mutex_unlock(&priv->sync_command_mutex);
 		} else {
 			mutex_unlock(&priv->sync_command_mutex);
-			ca8210_test_int_driver_write(buf, len, priv->spi);
+			if (cascoda_api_upstream != NULL)
+				cascoda_api_upstream(buf, len, priv->spi);
 			priv->sync_up++;
 		}
 	} else {
-		ca8210_test_int_driver_write(buf, len, priv->spi);
+		if (cascoda_api_upstream != NULL)
+			cascoda_api_upstream(buf, len, priv->spi);
 	}
 
 	ca8210_net_rx(priv->hw, buf, len);
@@ -1322,19 +1330,12 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-/* Cascoda API links */
 static int (*cascoda_api_downstream)(
 	const uint8_t *buf,
 	size_t len,
 	uint8_t *response,
 	void *device_ref
 ) = ca8210_spi_exchange;
-
-static int (*cascoda_api_upstream)(
-	const uint8_t *buf,
-	size_t len,
-	void *device_ref
-) = ca8210_test_int_driver_write;
 
 /* Cascoda API / 15.4 SAP Primitives */
 
@@ -2746,7 +2747,8 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 			response[2] = MAC_INVALID_PARAMETER;
 			response[3] = buf[2];
 			response[4] = buf[3];
-			cascoda_api_upstream(response, 5, device_ref);
+			if (cascoda_api_upstream != NULL)
+				cascoda_api_upstream(response, 5, device_ref);
 			return ret;
 		}
 	}
@@ -3401,7 +3403,9 @@ static int ca8210_probe(struct spi_device *spi_device)
 	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
 
-	ca8210_test_interface_init(priv);
+	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
+		ca8210_test_interface_init(priv);
+	}
 	ca8210_hw_setup(hw);
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
 
@@ -3503,6 +3507,12 @@ static struct spi_driver ca8210_spi_driver = {
 static int __init ca8210_init(void)
 {
 	pr_info("Starting module ca8210\n");
+
+	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS))
+		cascoda_api_upstream = ca8210_test_int_driver_write;
+	else
+		cascoda_api_upstream = NULL;
+
 	spi_register_driver(&ca8210_spi_driver);
 	pr_info("ca8210 module started\n");
 	return 0;
