@@ -74,8 +74,6 @@
 #include <net/ieee802154_netdev.h>
 #include <net/mac802154.h>
 
-/******************************************************************************/
-
 #define DRIVER_NAME "ca8210"
 
 /* external clock frequencies */
@@ -284,7 +282,6 @@
 #define CA8210_SFR_LNAGX46                 (0xE7)
 #define CA8210_SFR_LNAGX47                 (0xE9)
 
-/******************************************************************************/
 /* Structs/Enums */
 
 /**
@@ -525,9 +522,6 @@ struct mac_message {
 	} pdata;
 };
 
-/******************************************************************************/
-/* Utility */
-
 /**
  * link_to_linux_err() - Translates an 802.15.4 return code into the closest
  *                       linux error
@@ -635,7 +629,6 @@ static int ca8210_test_int_driver_write(
 	return 0;
 }
 
-/******************************************************************************/
 /* SPI Operation */
 
 static int ca8210_spi_writeDummy(struct spi_device *spi);
@@ -1329,7 +1322,6 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-/******************************************************************************/
 /* Cascoda API links */
 static int (*cascoda_api_downstream)(
 	const uint8_t *buf,
@@ -1344,8 +1336,6 @@ static int (*cascoda_api_upstream)(
 	void *device_ref
 ) = ca8210_test_int_driver_write;
 
-
-/******************************************************************************/
 /* Cascoda API / 15.4 SAP Primitives */
 
 /**
@@ -1959,7 +1949,6 @@ static uint8_t HWME_GET_request_sync(
 	return response.pdata.hwme_get_cnf.status;
 }
 
-/******************************************************************************/
 /* Network driver operation */
 
 /**
@@ -2719,7 +2708,6 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_frame_retries = ca8210_set_frame_retries
 };
 
-/******************************************************************************/
 /* Test/EVBME Interface */
 
 /**
@@ -2903,7 +2891,6 @@ static const struct file_operations test_int_fops = {
 	.release =  NULL
 };
 
-/******************************************************************************/
 /* Init/Deinit */
 
 /**
@@ -3512,9 +3499,6 @@ static struct spi_driver ca8210_spi_driver = {
 	.probe  =                       ca8210_probe,
 	.remove =                       ca8210_remove
 };
-
-/******************************************************************************/
-/* Module */
 
 static int __init ca8210_init(void)
 {
