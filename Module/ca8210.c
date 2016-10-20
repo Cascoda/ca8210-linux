@@ -453,7 +453,7 @@ struct secspec {
 };
 
 /* downlink functions parameter set definitions */
-struct MCPS_DATA_request_pset {
+struct mcps_data_request_pset {
 	uint8_t         src_addr_mode;
 	struct fulladdr dst;
 	uint8_t         msdu_length;
@@ -462,43 +462,43 @@ struct MCPS_DATA_request_pset {
 	uint8_t         msdu[MAX_DATA_SIZE];
 };
 
-struct MLME_SET_request_pset {
+struct mlme_set_request_pset {
 	uint8_t         pib_attribute;
 	uint8_t         pib_attribute_index;
 	uint8_t         pib_attribute_length;
 	uint8_t         pib_attribute_value[MAX_ATTRIBUTE_SIZE];
 };
 
-struct HWME_SET_request_pset {
+struct hwme_set_request_pset {
 	uint8_t         hw_attribute;
 	uint8_t         hw_attribute_length;
 	uint8_t         hw_attribute_value[MAX_HWME_ATTRIBUTE_SIZE];
 };
 
-struct HWME_GET_request_pset {
+struct hwme_get_request_pset {
 	uint8_t         hw_attribute;
 };
 
-struct TDME_SETSFR_request_pset {
+struct tdme_setsfr_request_pset {
 	uint8_t         sfr_page;
 	uint8_t         sfr_address;
 	uint8_t         sfr_value;
 };
 
 /* uplink functions parameter set definitions */
-struct HWME_SET_confirm_pset {
+struct hwme_set_confirm_pset {
 	uint8_t         status;
 	uint8_t         hw_attribute;
 };
 
-struct HWME_GET_confirm_pset {
+struct hwme_get_confirm_pset {
 	uint8_t         status;
 	uint8_t         hw_attribute;
 	uint8_t         hw_attribute_length;
 	uint8_t         hw_attribute_value[MAX_HWME_ATTRIBUTE_SIZE];
 };
 
-struct TDME_SETSFR_confirm_pset {
+struct tdme_setsfr_confirm_pset {
 	uint8_t         status;
 	uint8_t         sfr_page;
 	uint8_t         sfr_address;
@@ -508,14 +508,14 @@ struct mac_message {
 	uint8_t      command_id;
 	uint8_t      length;
 	union {
-		struct MCPS_DATA_request_pset       data_req;
-		struct MLME_SET_request_pset        set_req;
-		struct HWME_SET_request_pset        hwme_set_req;
-		struct HWME_GET_request_pset        hwme_get_req;
-		struct TDME_SETSFR_request_pset     tdme_set_sfr_req;
-		struct HWME_SET_confirm_pset        hwme_set_cnf;
-		struct HWME_GET_confirm_pset        hwme_get_cnf;
-		struct TDME_SETSFR_confirm_pset     tdme_set_sfr_cnf;
+		struct mcps_data_request_pset       data_req;
+		struct mlme_set_request_pset        set_req;
+		struct hwme_set_request_pset        hwme_set_req;
+		struct hwme_get_request_pset        hwme_get_req;
+		struct tdme_setsfr_request_pset     tdme_set_sfr_req;
+		struct hwme_set_confirm_pset        hwme_set_cnf;
+		struct hwme_get_confirm_pset        hwme_get_cnf;
+		struct tdme_setsfr_confirm_pset     tdme_set_sfr_cnf;
 		uint8_t                             u8param;
 		uint8_t                             status;
 		uint8_t                             payload[254];
@@ -643,7 +643,7 @@ static int ca8210_net_rx(
 	uint8_t               *command,
 	size_t                 len
 );
-static uint8_t MLME_RESET_request_sync(
+static uint8_t mlme_reset_request_sync(
 	uint8_t  set_default_pib,
 	void    *device_ref
 );
@@ -761,7 +761,7 @@ static void ca8210_rx_done(struct work_struct *work)
 			dev_info(
 				&priv->spi->dev,
 				"Resetting MAC...\n");
-			MLME_RESET_request_sync(0, priv->spi);
+			mlme_reset_request_sync(0, priv->spi);
 		}
 	} else if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
 		dev_notice(
@@ -1340,7 +1340,7 @@ static int (*cascoda_api_downstream)(
 /* Cascoda API / 15.4 SAP Primitives */
 
 /**
- * TDME_SETSFR_request_sync() - TDME_SETSFR_request/confirm according to API
+ * tdme_setsfr_request_sync() - TDME_SETSFR_request/confirm according to API
  * @sfr_page:    SFR Page
  * @sfr_address: SFR Address
  * @sfr_value:   SFR Value
@@ -1348,7 +1348,7 @@ static int (*cascoda_api_downstream)(
  *
  * Return: 802.15.4 status code of TDME-SETSFR.confirm
  */
-static uint8_t TDME_SETSFR_request_sync(
+static uint8_t tdme_setsfr_request_sync(
 	uint8_t      sfr_page,
 	uint8_t      sfr_address,
 	uint8_t      sfr_value,
@@ -1390,56 +1390,56 @@ static uint8_t TDME_SETSFR_request_sync(
 }
 
 /**
- * TDME_ChipInit() - TDME Chip Register Default Initialisation Macro
+ * tdme_chipinit() - TDME Chip Register Default Initialisation Macro
  * @device_ref: Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of API calls
  */
-static uint8_t TDME_ChipInit(void *device_ref)
+static uint8_t tdme_chipinit(void *device_ref)
 {
 	uint8_t status;
 
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX40, 0x29, device_ref))
 	)  /* LNA Gain Settings */
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX41, 0x54, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX42, 0x6C, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX43, 0x7A, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX44, 0x84, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX45, 0x8B, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX46, 0x92, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_LNAGX47, 0x96, device_ref))
 	)
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_PRECFG, 0x5B, device_ref))
 	) /* Preamble Timing Config */
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		1, CA8210_SFR_PTHRH, 0x5A, device_ref))
 	) /* Preamble Threshold High */
 		return status;
-	if ((status = TDME_SETSFR_request_sync(
+	if ((status = tdme_setsfr_request_sync(
 		0, CA8210_SFR_PACFGIB, 0x3F, device_ref))
 	) /* Tx Output Power 8 dBm */
 		return status;
@@ -1448,13 +1448,13 @@ static uint8_t TDME_ChipInit(void *device_ref)
 }
 
 /**
- * TDME_ChannelInit() - TDME Channel Register Default Initialisation Macro (Tx)
+ * tdme_channelinit() - TDME Channel Register Default Initialisation Macro (Tx)
  * @channel:    802.15.4 channel to initialise chip for
  * @device_ref: Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of API calls
  */
-static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
+static uint8_t tdme_channelinit(uint8_t channel, void *device_ref)
 {
 	uint8_t txcalval;
 
@@ -1477,7 +1477,7 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
 	else
 		txcalval = 0xAF;
 
-	return TDME_SETSFR_request_sync(
+	return tdme_setsfr_request_sync(
 		1,
 		CA8210_SFR_LOTXCAL,
 		txcalval,
@@ -1486,7 +1486,7 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
 }
 
 /**
- * TDME_CheckPIBAttribute() - Checks Attribute Values that are not checked in
+ * tdme_checkpibattribute() - Checks Attribute Values that are not checked in
  *                            MAC
  * @pib_attribute:        Attribute Number
  * @pib_attribute_length: Attribute length
@@ -1495,7 +1495,7 @@ static uint8_t TDME_ChannelInit(uint8_t channel, void *device_ref)
  *
  * Return: 802.15.4 status code of checks
  */
-static uint8_t TDME_CheckPIBAttribute(
+static uint8_t tdme_checkpibattribute(
 	uint8_t      pib_attribute,
 	uint8_t      pib_attribute_length,
 	const void   *pib_attribute_value
@@ -1586,7 +1586,7 @@ static uint8_t TDME_CheckPIBAttribute(
 }
 
 /**
- * TDME_SetTxPower() - Sets the tx power for MLME_SET phyTransmitPower
+ * tdme_settxpower() - Sets the tx power for MLME_SET phyTransmitPower
  * @txp:        Transmit Power
  * @device_ref: Nondescript pointer to target device
  *
@@ -1596,7 +1596,7 @@ static uint8_t TDME_CheckPIBAttribute(
  *
  * Return: 802.15.4 status code of api calls
  */
-static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
+static uint8_t tdme_settxpower(uint8_t txp, void *device_ref)
 {
 	uint8_t status;
 	int8_t txp_val;
@@ -1618,7 +1618,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 			paib = 0x73;
 		}
 		/* write PACFG */
-		status = TDME_SETSFR_request_sync(
+		status = tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_PACFG,
 			paib,
@@ -1651,7 +1651,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 			paib = 0x00;
 		}
 		/* write PACFGIB */
-		status = TDME_SETSFR_request_sync(
+		status = tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_PACFGIB,
 			paib,
@@ -1663,7 +1663,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
 }
 
 /**
- * MCPS_DATA_request() - MCPS_DATA_request (Send Data) according to API Spec
+ * mcps_data_request() - mcps_data_request (Send Data) according to API Spec
  * @src_addr_mode:    Source Addressing Mode
  * @dst_address_mode: Destination Addressing Mode
  * @dst_pan_id:       Destination PAN ID
@@ -1677,7 +1677,7 @@ static uint8_t TDME_SetTxPower(uint8_t txp, void *device_ref)
  *
  * Return: 802.15.4 status code of action
  */
-static uint8_t MCPS_DATA_request(
+static uint8_t mcps_data_request(
 	uint8_t          src_addr_mode,
 	uint8_t          dst_address_mode,
 	uint16_t         dst_pan_id,
@@ -1716,7 +1716,7 @@ static uint8_t MCPS_DATA_request(
 	DATAREQ.tx_options = tx_options;
 	memcpy(DATAREQ.msdu, msdu, msdu_length);
 	pSec = (struct secspec *)(DATAREQ.msdu + msdu_length);
-	command.length = sizeof(struct MCPS_DATA_request_pset) -
+	command.length = sizeof(struct mcps_data_request_pset) -
 		MAX_DATA_SIZE + msdu_length;
 	if ((security == NULL) || (security->security_level == 0)) {
 		pSec->security_level = 0;
@@ -1736,13 +1736,13 @@ static uint8_t MCPS_DATA_request(
 }
 
 /**
- * MLME_RESET_request_sync() - MLME_RESET_request/confirm according to API Spec
+ * mlme_reset_request_sync() - MLME_RESET_request/confirm according to API Spec
  * @set_default_pib: Set defaults in PIB
  * @device_ref:      Nondescript pointer to target device
  *
  * Return: 802.15.4 status code of MLME-RESET.confirm
  */
-static uint8_t MLME_RESET_request_sync(
+static uint8_t mlme_reset_request_sync(
 	uint8_t  set_default_pib,
 	void    *device_ref
 )
@@ -1773,7 +1773,7 @@ static uint8_t MLME_RESET_request_sync(
 
 	/* reset COORD Bit for Channel Filtering as Coordinator */
 	if (CA8210_MAC_WORKAROUNDS && set_default_pib && (!status)) {
-		status = TDME_SETSFR_request_sync(
+		status = tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_MACCON,
 			0,
@@ -1787,7 +1787,7 @@ static uint8_t MLME_RESET_request_sync(
 }
 
 /**
- * MLME_SET_request_sync() - MLME_SET_request/confirm according to API Spec
+ * mlme_set_request_sync() - MLME_SET_request/confirm according to API Spec
  * @pib_attribute:        Attribute Number
  * @pib_attribute_index:  Index within Attribute if an Array
  * @pib_attribute_length: Attribute length
@@ -1796,7 +1796,7 @@ static uint8_t MLME_RESET_request_sync(
  *
  * Return: 802.15.4 status code of MLME-SET.confirm
  */
-static uint8_t MLME_SET_request_sync(
+static uint8_t mlme_set_request_sync(
 	uint8_t       pib_attribute,
 	uint8_t       pib_attribute_index,
 	uint8_t       pib_attribute_length,
@@ -1812,13 +1812,13 @@ static uint8_t MLME_SET_request_sync(
 	/* pre-check the validity of pib_attribute values that are not checked
 	 * in MAC
 	 */
-	if (TDME_CheckPIBAttribute(
+	if (tdme_checkpibattribute(
 		pib_attribute, pib_attribute_length, pib_attribute_value)) {
 		return MAC_INVALID_PARAMETER;
 	}
 
 	if (pib_attribute == PHY_CURRENT_CHANNEL) {
-		status = TDME_ChannelInit(
+		status = tdme_channelinit(
 			*((uint8_t *)pib_attribute_value),
 			device_ref
 		);
@@ -1828,14 +1828,14 @@ static uint8_t MLME_SET_request_sync(
 	}
 
 	if (pib_attribute == PHY_TRANSMIT_POWER) {
-		return TDME_SetTxPower(
+		return tdme_settxpower(
 			*((uint8_t *)pib_attribute_value),
 			device_ref
 		);
 	}
 
 	command.command_id = SPI_MLME_SET_REQUEST;
-	command.length = sizeof(struct MLME_SET_request_pset) -
+	command.length = sizeof(struct mlme_set_request_pset) -
 		MAX_ATTRIBUTE_SIZE + pib_attribute_length;
 	SETREQ.pib_attribute = pib_attribute;
 	SETREQ.pib_attribute_index = pib_attribute_index;
@@ -1863,7 +1863,7 @@ static uint8_t MLME_SET_request_sync(
 }
 
 /**
- * HWME_SET_request_sync() - HWME_SET_request/confirm according to API Spec
+ * hwme_set_request_sync() - HWME_SET_request/confirm according to API Spec
  * @hw_attribute:        Attribute Number
  * @hw_attribute_length: Attribute length
  * @hw_attribute_value:  Pointer to Attribute Value
@@ -1871,7 +1871,7 @@ static uint8_t MLME_SET_request_sync(
  *
  * Return: 802.15.4 status code of HWME-SET.confirm
  */
-static uint8_t HWME_SET_request_sync(
+static uint8_t hwme_set_request_sync(
 	uint8_t      hw_attribute,
 	uint8_t      hw_attribute_length,
 	uint8_t     *hw_attribute_value,
@@ -1905,7 +1905,7 @@ static uint8_t HWME_SET_request_sync(
 }
 
 /**
- * HWME_GET_request_sync() - HWME_GET_request/confirm according to API Spec
+ * hwme_get_request_sync() - HWME_GET_request/confirm according to API Spec
  * @hw_attribute:        Attribute Number
  * @hw_attribute_length: Attribute length
  * @hw_attribute_value:  Pointer to Attribute Value
@@ -1913,7 +1913,7 @@ static uint8_t HWME_SET_request_sync(
  *
  * Return: 802.15.4 status code of HWME-GET.confirm
  */
-static uint8_t HWME_GET_request_sync(
+static uint8_t hwme_get_request_sync(
 	uint8_t      hw_attribute,
 	uint8_t     *hw_attribute_length,
 	uint8_t     *hw_attribute_value,
@@ -2187,7 +2187,7 @@ static int ca8210_skb_tx(
 	secspec.key_index = header.sec.key_id;
 
 	/* Pass to Cascoda API */
-	status =  MCPS_DATA_request(header.source.mode,
+	status =  mcps_data_request(header.source.mode,
 	                            header.dest.mode,
 	                            header.dest.pan_id,
 	                            (union macaddr *)&header.dest.extended_addr,
@@ -2301,7 +2301,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 	priv->last_dsn = -1;
 	/* Turn receiver on when idle for now just to test rx */
 	rx_on_when_idle = 1;
-	status = MLME_SET_request_sync(
+	status = mlme_set_request_sync(
 		MAC_RX_ON_WHEN_IDLE,
 		0,
 		1,
@@ -2402,7 +2402,7 @@ static int ca8210_get_ed(struct ieee802154_hw *hw, uint8_t *level)
 	struct ca8210_priv *priv = hw->priv;
 
 	return link_to_linux_err(
-		HWME_GET_request_sync(HWME_EDVALUE, &lenvar, level, priv->spi)
+		hwme_get_request_sync(HWME_EDVALUE, &lenvar, level, priv->spi)
 	);
 }
 
@@ -2424,7 +2424,7 @@ static int ca8210_set_channel(
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
 
-	status = MLME_SET_request_sync(
+	status = mlme_set_request_sync(
 		PHY_CURRENT_CHANNEL,
 		0,
 		1,
@@ -2464,7 +2464,7 @@ static int ca8210_set_hw_addr_filt(
 	struct ca8210_priv *priv = hw->priv;
 
 	if (changed&IEEE802154_AFILT_PANID_CHANGED) {
-		status = MLME_SET_request_sync(
+		status = mlme_set_request_sync(
 			MAC_PAN_ID,
 			0,
 			2,
@@ -2481,7 +2481,7 @@ static int ca8210_set_hw_addr_filt(
 		}
 	}
 	if (changed&IEEE802154_AFILT_SADDR_CHANGED) {
-		status = MLME_SET_request_sync(
+		status = mlme_set_request_sync(
 			MAC_SHORT_ADDRESS,
 			0,
 			2,
@@ -2498,7 +2498,7 @@ static int ca8210_set_hw_addr_filt(
 		}
 	}
 	if (changed&IEEE802154_AFILT_IEEEADDR_CHANGED) {
-		status = MLME_SET_request_sync(
+		status = mlme_set_request_sync(
 			NS_IEEE_ADDRESS,
 			0,
 			8,
@@ -2531,7 +2531,7 @@ static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
 	struct ca8210_priv *priv = hw->priv;
 
 	return link_to_linux_err(
-		MLME_SET_request_sync(PHY_TRANSMIT_POWER, 0, 1, &dbm, priv->spi)
+		mlme_set_request_sync(PHY_TRANSMIT_POWER, 0, 1, &dbm, priv->spi)
 	);
 }
 
@@ -2556,7 +2556,7 @@ static int ca8210_set_cca_mode(
 		/* cca_mode 0 == CS OR ED, 3 == CS AND ED */
 		cca_mode = 0;
 	}
-	status = MLME_SET_request_sync(
+	status = mlme_set_request_sync(
 		PHY_CCA_MODE,
 		0,
 		1,
@@ -2590,7 +2590,7 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, int32_t level)
 	uint8_t ed_threshold = level * 2 + 256;
 	struct ca8210_priv *priv = hw->priv;
 
-	status = HWME_SET_request_sync(
+	status = hwme_set_request_sync(
 		HWME_EDTHRESHOLD,
 		1,
 		&ed_threshold,
@@ -2626,7 +2626,7 @@ static int ca8210_set_csma_params(
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
 
-	status = MLME_SET_request_sync(MAC_MIN_BE, 0, 1, &min_be, priv->spi);
+	status = mlme_set_request_sync(MAC_MIN_BE, 0, 1, &min_be, priv->spi);
 	if (status) {
 		dev_err(
 			&priv->spi->dev,
@@ -2635,7 +2635,7 @@ static int ca8210_set_csma_params(
 		);
 		return link_to_linux_err(status);
 	}
-	status = MLME_SET_request_sync(MAC_MAX_BE, 0, 1, &max_be, priv->spi);
+	status = mlme_set_request_sync(MAC_MAX_BE, 0, 1, &max_be, priv->spi);
 	if (status) {
 		dev_err(
 			&priv->spi->dev,
@@ -2644,7 +2644,7 @@ static int ca8210_set_csma_params(
 		);
 		return link_to_linux_err(status);
 	}
-	status = MLME_SET_request_sync(
+	status = mlme_set_request_sync(
 		MAC_MAX_CSMA_BACKOFFS,
 		0,
 		1,
@@ -2677,7 +2677,7 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	uint8_t status;
 	struct ca8210_priv *priv = hw->priv;
 
-	status = MLME_SET_request_sync(
+	status = mlme_set_request_sync(
 		MAC_MAX_FRAME_RETRIES,
 		0,
 		1,
@@ -2740,7 +2740,7 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 	uint8_t response[CA8210_SPI_BUF_SIZE];
 
 	if (buf[0] == SPI_MLME_SET_REQUEST) {
-		ret = TDME_CheckPIBAttribute(buf[2], buf[4], buf + 5);
+		ret = tdme_checkpibattribute(buf[2], buf[4], buf + 5);
 		if (ret) {
 			response[0]  = SPI_MLME_SET_CONFIRM;
 			response[1] = 3;
@@ -2753,19 +2753,19 @@ static int ca8210_test_check_upstream(uint8_t *buf, void *device_ref)
 		}
 	}
 	if (buf[0] == SPI_MLME_ASSOCIATE_REQUEST) {
-		return TDME_ChannelInit(buf[2], device_ref);
+		return tdme_channelinit(buf[2], device_ref);
 	} else if (buf[0] == SPI_MLME_START_REQUEST) {
-		return TDME_ChannelInit(buf[4], device_ref);
+		return tdme_channelinit(buf[4], device_ref);
 	} else if ((buf[0] == SPI_MLME_SET_REQUEST) &&
 	           (buf[2] == PHY_CURRENT_CHANNEL)) {
-		return TDME_ChannelInit(buf[5], device_ref);
+		return tdme_channelinit(buf[5], device_ref);
 	} else if ((buf[0] == SPI_TDME_SET_REQUEST) &&
 	           (buf[2] == TDME_CHANNEL)) {
-		return TDME_ChannelInit(buf[4], device_ref);
+		return tdme_channelinit(buf[4], device_ref);
 	} else if ((CA8210_MAC_WORKAROUNDS) &&
 	           (buf[0] == SPI_MLME_RESET_REQUEST) && (buf[2] == 1)) {
 		/* reset COORD Bit for Channel Filtering as Coordinator */
-		return TDME_SETSFR_request_sync(
+		return tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_MACCON,
 			0,
@@ -2978,7 +2978,7 @@ static int ca8210_config_extern_clk(
 		clkparam[1] = 0;
 	}
 	return link_to_linux_err(
-		HWME_SET_request_sync(HWME_SYSCLKOUT, 2, clkparam, spi)
+		hwme_set_request_sync(HWME_SYSCLKOUT, 2, clkparam, spi)
 	);
 }
 
@@ -3447,9 +3447,9 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	ca8210_reset_send(priv->spi, 1);
 
-	ret = TDME_ChipInit(priv->spi);
+	ret = tdme_chipinit(priv->spi);
 	if (ret) {
-		dev_crit(&spi_device->dev, "TDME_ChipInit failed\n");
+		dev_crit(&spi_device->dev, "tdme_chipinit failed\n");
 		goto error;
 	}
 
