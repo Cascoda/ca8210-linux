@@ -637,7 +637,7 @@ static int ca8210_test_int_driver_write(
 
 /* SPI Operation */
 
-static int ca8210_spi_writeDummy(struct spi_device *spi);
+static int ca8210_spi_write_dummy(struct spi_device *spi);
 static int ca8210_net_rx(
 	struct ieee802154_hw  *hw,
 	uint8_t               *command,
@@ -950,7 +950,7 @@ static int ca8210_spi_read(struct spi_device *spi)
 	return 0;
 
 error:
-	ca8210_spi_writeDummy(spi);
+	ca8210_spi_write_dummy(spi);
 	return status;
 }
 
@@ -1043,7 +1043,7 @@ static int ca8210_spi_write(
 	        && priv->cas_ctl.tx_in_buf[1] == SPI_NACK) {
 		/* ca8210 is busy */
 		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
-		ca8210_spi_writeDummy(spi);
+		ca8210_spi_write_dummy(spi);
 		return -EBUSY;
 	} else if (!dummy) {
 		if (priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
@@ -1125,7 +1125,7 @@ static int ca8210_spi_write(
 }
 
 /**
- * ca8210_spi_writeDummy() - Write a "dummy" packet to the ca8210
+ * ca8210_spi_write_dummy() - Write a "dummy" packet to the ca8210
  * @spi:  Pointer to spi device to write to
  *
  * This functions exists solely to toggle the spi chip select to the ca8210. The
@@ -1138,7 +1138,7 @@ static int ca8210_spi_write(
  *
  * Return: 0 or linux error code
  */
-static int ca8210_spi_writeDummy(struct spi_device *spi)
+static int ca8210_spi_write_dummy(struct spi_device *spi)
 {
 	int ret;
 	uint8_t idle = SPI_IDLE;
