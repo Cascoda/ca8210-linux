@@ -64,6 +64,7 @@
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/poll.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
@@ -326,6 +327,7 @@ struct cas_control {
 struct ca8210_test {
 	struct dentry *ca8210_dfs_spi_int;
 	struct kfifo up_fifo;
+	wait_queue_head_t readq;
 };
 
 /**
@@ -2874,8 +2876,18 @@ static ssize_t ca8210_test_int_user_read(
 	struct ca8210_priv *priv = filp->private_data;
 	unsigned char *fifo_buffer;
 
-	if (kfifo_is_empty(&priv->test.up_fifo))
-		return 0;
+	if (filp->f_flags & O_NONBLOCK) {
+		/* Non-blocking mode */
+		if (kfifo_is_empty(&priv->test.up_fifo))
+			return 0;
+	} else {
+		/* Blocking mode */
+		wait_event_interruptible(
+			priv->test.readq,
+			!kfifo_is_empty(&priv->test.up_fifo)
+		);
+	}
+
 
 	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, 4) != 4) {
 		dev_err(
@@ -2917,12 +2929,32 @@ static long ca8210_test_int_ioctl(
 	return 0;
 }
 
+static unsigned int ca8210_test_int_poll(
+	struct file *filp,
+	struct poll_table_struct *ptable
+)
+{
+	unsigned int return_flags = 0;
+	struct ca8210_priv *priv = filp->private_data;
+	poll_wait(filp, &priv->test.readq, ptable);
+	if (!kfifo_is_empty(&priv->test.up_fifo)) {
+		return_flags |= (POLLIN | POLLRDNORM);
+	}
+	if (wait_event_interruptible(
+		priv->test.readq,
+		!kfifo_is_empty(&priv->test.up_fifo))) {
+		return POLLERR;
+	}
+	return return_flags;
+}
+
 static const struct file_operations test_int_fops = {
 	.read =           ca8210_test_int_user_read,
 	.write =          ca8210_test_int_user_write,
 	.open =           ca8210_test_int_open,
 	.release =        NULL,
-	.unlocked_ioctl = ca8210_test_int_ioctl
+	.unlocked_ioctl = ca8210_test_int_ioctl,
+	.poll =           ca8210_test_int_poll
 };
 
 /* Init/Deinit */
@@ -3327,7 +3359,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		return PTR_ERR(test->ca8210_dfs_spi_int);
 	}
 	debugfs_create_symlink("ca8210", NULL, node_name);
-
+	init_waitqueue_head(&test->readq);
 	return kfifo_alloc(
 		&test->up_fifo,
 		CA8210_TEST_INT_FIFO_SIZE,
