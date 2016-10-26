@@ -1,7 +1,7 @@
 * CA8210 IEEE 802.15.4 *
 
 Required properties:
-	- compatible:           should be "cascoda,ca8210"
+	- compatible:           Should be "cascoda,ca8210"
 	- reg:                  Controlling chip select
 	- spi-max-frequency:    Maximum clock speed, should be *less than*
 	                        4000000
