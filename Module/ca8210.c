@@ -2046,6 +2046,14 @@ static int ca8210_skb_rx(
 	skb_reserve(skb, sizeof(hdr));
 
 	msdulen = data_ind[22]; /* msdu_length */
+	if (msdulen > 127) {
+		dev_err(
+			&priv->spi->dev,
+			"received erroneously large msdu length!\n"
+		);
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
 
 	/* Populate hdr */
@@ -2083,8 +2091,11 @@ static int ca8210_skb_rx(
 	/* Add hdr to front of buffer */
 	hlen = ieee802154_hdr_push(skb, &hdr);
 
-	if (hlen < 0)
+	if (hlen < 0) {
+		dev_crit(&priv->spi->dev, "failed to push mac hdr onto skb!\n");
+		kfree_skb(skb);
 		return hlen;
+	}
 
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
