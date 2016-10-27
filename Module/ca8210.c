@@ -653,7 +653,7 @@ static uint8_t mlme_reset_request_sync(
  * @spi:  Pointer to target ca8210 spi device
  * @ms:   Milliseconds to hold the reset line low for
  */
-static void ca8210_reset_send(struct spi_device *spi, int ms)
+static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
