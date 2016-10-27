@@ -687,8 +687,7 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 }
 
 /**
- * ca8210_MLME_reset_worker() - Starts the spi read process after having the work
- *                       handed off by the interrupt handler
+ * ca8210_MLME_reset_worker() - Resets the MLME, Called when the MAC OVERFLOW condition happens.
  * @work:  Pointer to work being executed
  */
 static void ca8210_MLME_reset_worker(struct work_struct *work)
