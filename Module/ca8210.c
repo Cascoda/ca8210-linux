@@ -337,7 +337,7 @@ struct ca8210_test {
  * @hw_registered:          true if hw has been registered with ieee802154
  * @lock:                   spinlock protecting the private data area
  * @async_tx_workqueue:     workqueue for asynchronous transmission
- * @rx_workqueue:           workqueue for receive processing
+ * @mlme_workqueue:           workqueue for triggering MLME Reset
  * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
@@ -368,7 +368,7 @@ struct ca8210_priv {
 	struct ieee802154_hw *hw;
 	bool hw_registered;
 	spinlock_t lock;
-	struct workqueue_struct *async_tx_workqueue, *rx_workqueue;
+	struct workqueue_struct *async_tx_workqueue, *mlme_workqueue;
 	struct workqueue_struct *irq_workqueue;
 	struct work_struct async_tx_work;
 	struct delayed_work async_tx_timeout_work;
@@ -658,7 +658,7 @@ static uint8_t mlme_reset_request_sync(
  * @spi:  Pointer to target ca8210 spi device
  * @ms:   Milliseconds to hold the reset line low for
  */
-static void ca8210_reset_send(struct spi_device *spi, int ms)
+static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
@@ -692,34 +692,56 @@ static void ca8210_reset_send(struct spi_device *spi, int ms)
 }
 
 /**
- * ca8210_rx_done() - Calls various message dispatches responding to a received
- *                    command
+ * ca8210_mlme_reset_worker() - Resets the MLME, Called when the MAC OVERFLOW
+ *                              condition happens.
  * @work:  Pointer to work being executed
- *
- * Presents a received SAP command from the ca8210 to the Cascoda EVBME, test
- * interface and network driver.
  */
-static void ca8210_rx_done(struct work_struct *work)
+static void ca8210_mlme_reset_worker(struct work_struct *work)
 {
 	struct work_priv_container *wpc = container_of(
 		work,
 		struct work_priv_container,
 		work
 	);
+
 	struct ca8210_priv *priv = wpc->priv;
+	mlme_reset_request_sync(0, priv->spi);
+	kfree(wpc);
+}
+
+/**
+ * ca8210_rx_done() - Calls various message dispatches responding to a received
+ *                    command
+ * @arg:  Pointer to the drivers private data structure
+ *
+ * Presents a received SAP command from the ca8210 to the Cascoda EVBME, test
+ * interface and network driver.
+ */
+static void ca8210_rx_done(struct ca8210_priv *priv)
+{
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
+	struct work_priv_container *mlme_reset_wpc;
+
 
 	spin_lock_irqsave(&priv->lock, flags);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
-	if (len > CA8210_SPI_BUF_SIZE)
+	if (len > CA8210_SPI_BUF_SIZE) {
 		dev_crit(
 			&priv->spi->dev,
 			"Received packet len (%d) erroneously long\n",
 			len
 		);
+		memset(
+			priv->cas_ctl.rx_final_buf,
+			SPI_IDLE,
+			CA8210_SPI_BUF_SIZE
+		);
+		spin_unlock_irqrestore(&priv->lock, flags);
+		return;
+	}
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -728,7 +750,7 @@ static void ca8210_rx_done(struct work_struct *work)
 
 	if (buf[0] & SPI_SYN) {
 		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-			goto cleanup;
+			return;
 		}
 		if (priv->sync_command_pending) {
 			if (priv->sync_command_response == NULL) {
@@ -739,7 +761,7 @@ static void ca8210_rx_done(struct work_struct *work)
 					"Sync command provided no response " \
 					"buffer\n"
 				);
-				goto cleanup;
+				return;
 			}
 			memcpy(priv->sync_command_response, buf, len);
 			priv->sync_command_pending = false;
@@ -766,7 +788,17 @@ static void ca8210_rx_done(struct work_struct *work)
 			dev_info(
 				&priv->spi->dev,
 				"Resetting MAC...\n");
-			mlme_reset_request_sync(0, priv->spi);
+
+			mlme_reset_wpc = kmalloc(
+				sizeof(struct work_priv_container),
+				GFP_KERNEL
+			);
+			INIT_WORK(
+				&mlme_reset_wpc->work,
+				ca8210_mlme_reset_worker
+			);
+			mlme_reset_wpc->priv = priv;
+			queue_work(priv->mlme_workqueue, &mlme_reset_wpc->work);
 		}
 	} else if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
 		dev_notice(
@@ -829,8 +861,7 @@ static void ca8210_rx_done(struct work_struct *work)
 		spin_unlock_irqrestore(&priv->lock, flags);
 	}
 
-cleanup:
-	kfree(wpc);
+	return;
 }
 
 /**
@@ -944,14 +975,8 @@ static int ca8210_spi_read(struct spi_device *spi)
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.rx_final_buf[i]);
 	}
 
-	/* Offload rx processing to workqueue */
-	rx_wpc = kmalloc(
-		sizeof(struct work_priv_container),
-		GFP_KERNEL
-	);
-	INIT_WORK(&rx_wpc->work, ca8210_rx_done);
-	rx_wpc->priv = priv;
-	queue_work(priv->rx_workqueue, &rx_wpc->work);
+
+	ca8210_rx_done(priv);
 	return 0;
 
 error:
@@ -1118,13 +1143,7 @@ static int ca8210_spi_write(
 			priv->cas_ctl.tx_in_buf + 2,
 			priv->cas_ctl.rx_final_buf[1]
 		);
-		rx_wpc = kmalloc(
-			sizeof(struct work_priv_container),
-			GFP_KERNEL
-		);
-		INIT_WORK(&rx_wpc->work, ca8210_rx_done);
-		rx_wpc->priv = priv;
-		queue_work(priv->rx_workqueue, &rx_wpc->work);
+		ca8210_rx_done(priv);
 	}
 	return status;
 }
@@ -2055,6 +2074,14 @@ static int ca8210_skb_rx(
 	skb_reserve(skb, sizeof(hdr));
 
 	msdulen = data_ind[22]; /* msdu_length */
+	if (msdulen > 127) {
+		dev_err(
+			&priv->spi->dev,
+			"received erroneously large msdu length!\n"
+		);
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
 
 	/* Populate hdr */
@@ -2092,8 +2119,11 @@ static int ca8210_skb_rx(
 	/* Add hdr to front of buffer */
 	hlen = ieee802154_hdr_push(skb, &hdr);
 
-	if (hlen < 0)
+	if (hlen < 0) {
+		dev_crit(&priv->spi->dev, "failed to push mac hdr onto skb!\n");
+		kfree_skb(skb);
 		return hlen;
+	}
 
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
@@ -3237,13 +3267,14 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->rx_workqueue = alloc_ordered_workqueue(
-		"ca8210 rx worker",
+	priv->mlme_workqueue = alloc_ordered_workqueue(
+		"MLME work queue",
 		WQ_UNBOUND
 	);
-	if (priv->rx_workqueue == NULL) {
-		dev_crit(&priv->spi->dev, "alloc of rx_workqueue failed!\n");
+	if (priv->mlme_workqueue == NULL) {
+		dev_crit(&priv->spi->dev, "alloc of mlme_workqueue failed!\n");
 	}
+
 	priv->irq_workqueue = alloc_ordered_workqueue(
 		"ca8210 irq worker",
 		WQ_UNBOUND
@@ -3275,8 +3306,8 @@ error:
  */
 static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
-	flush_workqueue(priv->rx_workqueue);
-	destroy_workqueue(priv->rx_workqueue);
+	flush_workqueue(priv->mlme_workqueue);
+	destroy_workqueue(priv->mlme_workqueue);
 	flush_workqueue(priv->irq_workqueue);
 	destroy_workqueue(priv->irq_workqueue);
 
