@@ -5,7 +5,7 @@ Required properties:
 	- reg:                  Controlling chip select
 	- spi-max-frequency:    Maximum clock speed, should be *less than*
 	                        4000000
-	- spi-cpol:             Invert clock polarity
+	- spi-cpol:             Requires inverted clock polarity (mode 2)
 	- reset-gpio:           GPIO attached to reset
 	- irq-gpio:             GPIO attached to IRQ
 Optional properties:
