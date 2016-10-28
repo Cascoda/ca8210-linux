@@ -333,7 +333,7 @@ struct ca8210_test {
  * @hw_registered:          true if hw has been registered with ieee802154
  * @lock:                   spinlock protecting the private data area
  * @async_tx_workqueue:     workqueue for asynchronous transmission
- * @MLME_workqueue:           workqueue for triggering MLME Reset
+ * @mlme_workqueue:           workqueue for triggering MLME Reset
  * @irq_workqueue:          workqueue for irq processing
  * @async_tx_work:          work object for a single asynchronous transmission
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
@@ -364,7 +364,7 @@ struct ca8210_priv {
 	struct ieee802154_hw *hw;
 	bool hw_registered;
 	spinlock_t lock;
-	struct workqueue_struct *async_tx_workqueue, *MLME_workqueue;
+	struct workqueue_struct *async_tx_workqueue, *mlme_workqueue;
 	struct workqueue_struct *irq_workqueue;
 	struct work_struct async_tx_work;
 	struct delayed_work async_tx_timeout_work;
@@ -687,10 +687,11 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 }
 
 /**
- * ca8210_MLME_reset_worker() - Resets the MLME, Called when the MAC OVERFLOW condition happens.
+ * ca8210_mlme_reset_worker() - Resets the MLME, Called when the MAC OVERFLOW
+ *                              condition happens.
  * @work:  Pointer to work being executed
  */
-static void ca8210_MLME_reset_worker(struct work_struct *work)
+static void ca8210_mlme_reset_worker(struct work_struct *work)
 {
 	struct work_priv_container *wpc = container_of(
 		work,
@@ -716,7 +717,7 @@ static void ca8210_rx_done(struct ca8210_priv *priv)
 	uint8_t buf[CA8210_SPI_BUF_SIZE];
 	uint8_t len;
 	unsigned long flags;
-	struct work_priv_container *mlme_reset_wq;
+	struct work_priv_container *mlme_reset_wpc;
 
 
 	spin_lock_irqsave(&priv->lock, flags);
@@ -783,10 +784,16 @@ static void ca8210_rx_done(struct ca8210_priv *priv)
 				&priv->spi->dev,
 				"Resetting MAC...\n");
 
-			mlme_reset_wq = kmalloc(sizeof(struct work_priv_container),GFP_KERNEL);
-			INIT_WORK(&mlme_reset_wq->work, ca8210_MLME_reset_worker);
-			mlme_reset_wq->priv = priv;
-			queue_work(priv->MLME_workqueue, &mlme_reset_wq->work);
+			mlme_reset_wpc = kmalloc(
+				sizeof(struct work_priv_container),
+				GFP_KERNEL
+			);
+			INIT_WORK(
+				&mlme_reset_wpc->work,
+				ca8210_mlme_reset_worker
+			);
+			mlme_reset_wpc->priv = priv;
+			queue_work(priv->mlme_workqueue, &mlme_reset_wpc->work);
 		}
 	} else if (buf[0] == SPI_HWME_WAKEUP_INDICATION) {
 		dev_notice(
@@ -3196,12 +3203,18 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
-	priv->MLME_workqueue = alloc_ordered_workqueue("MLME work queue", WQ_UNBOUND);
-	if (priv->MLME_workqueue == NULL) {
-		dev_crit(&priv->spi->dev, "alloc of MLME_workqueue failed!\n");
+	priv->mlme_workqueue = alloc_ordered_workqueue(
+		"MLME work queue",
+		WQ_UNBOUND
+	);
+	if (priv->mlme_workqueue == NULL) {
+		dev_crit(&priv->spi->dev, "alloc of mlme_workqueue failed!\n");
 	}
 
-	priv->irq_workqueue = alloc_ordered_workqueue("ca8210 irq worker", WQ_UNBOUND);
+	priv->irq_workqueue = alloc_ordered_workqueue(
+		"ca8210 irq worker",
+		WQ_UNBOUND
+	);
 	if (priv->irq_workqueue == NULL) {
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 	}
@@ -3229,8 +3242,8 @@ error:
  */
 static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 {
-	flush_workqueue(priv->MLME_workqueue);
-	destroy_workqueue(priv->MLME_workqueue);
+	flush_workqueue(priv->mlme_workqueue);
+	destroy_workqueue(priv->mlme_workqueue);
 	flush_workqueue(priv->irq_workqueue);
 	destroy_workqueue(priv->irq_workqueue);
 
