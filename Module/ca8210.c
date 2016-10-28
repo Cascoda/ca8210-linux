@@ -653,7 +653,7 @@ static uint8_t mlme_reset_request_sync(
  * @spi:  Pointer to target ca8210 spi device
  * @ms:   Milliseconds to hold the reset line low for
  */
-static void ca8210_reset_send(struct spi_device *spi, int ms)
+static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
@@ -709,12 +709,20 @@ static void ca8210_rx_done(struct work_struct *work)
 	spin_lock_irqsave(&priv->lock, flags);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
-	if (len > CA8210_SPI_BUF_SIZE)
+	if (len > CA8210_SPI_BUF_SIZE) {
 		dev_crit(
 			&priv->spi->dev,
 			"Received packet len (%d) erroneously long\n",
 			len
 		);
+		memset(
+			priv->cas_ctl.rx_final_buf,
+			SPI_IDLE,
+			CA8210_SPI_BUF_SIZE
+		);
+		spin_unlock_irqrestore(&priv->lock, flags);
+		return;
+	}
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -2046,6 +2054,14 @@ static int ca8210_skb_rx(
 	skb_reserve(skb, sizeof(hdr));
 
 	msdulen = data_ind[22]; /* msdu_length */
+	if (msdulen > 127) {
+		dev_err(
+			&priv->spi->dev,
+			"received erroneously large msdu length!\n"
+		);
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
 
 	/* Populate hdr */
@@ -2083,8 +2099,11 @@ static int ca8210_skb_rx(
 	/* Add hdr to front of buffer */
 	hlen = ieee802154_hdr_push(skb, &hdr);
 
-	if (hlen < 0)
+	if (hlen < 0) {
+		dev_crit(&priv->spi->dev, "failed to push mac hdr onto skb!\n");
+		kfree_skb(skb);
 		return hlen;
+	}
 
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
