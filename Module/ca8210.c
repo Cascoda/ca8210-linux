@@ -709,12 +709,20 @@ static void ca8210_rx_done(struct work_struct *work)
 	spin_lock_irqsave(&priv->lock, flags);
 
 	len = priv->cas_ctl.rx_final_buf[1] + 2;
-	if (len > CA8210_SPI_BUF_SIZE)
+	if (len > CA8210_SPI_BUF_SIZE) {
 		dev_crit(
 			&priv->spi->dev,
 			"Received packet len (%d) erroneously long\n",
 			len
 		);
+		memset(
+			priv->cas_ctl.rx_final_buf,
+			SPI_IDLE,
+			CA8210_SPI_BUF_SIZE
+		);
+		spin_unlock_irqrestore(&priv->lock, flags);
+		return;
+	}
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
