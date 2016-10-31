@@ -1219,7 +1219,7 @@ static int ca8210_spi_exchange(
 		if (status == -EBUSY) {
 			msleep(1);
 			write_retries++;
-			if (write_retries > 100) {
+			if (write_retries > 20) {
 				dev_err(
 					&spi->dev,
 					"too many retries!\n"
