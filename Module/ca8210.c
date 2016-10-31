@@ -876,7 +876,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 	int status, i;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
-	struct work_priv_container *rx_wpc;
 
 	dev_dbg(&spi->dev, "ca8210_spi_read called\n");
 
@@ -1004,7 +1003,6 @@ static int ca8210_spi_write(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	int payload_len = 0;
-	struct work_priv_container *rx_wpc;
 
 	if (spi == NULL) {
 		dev_crit(
