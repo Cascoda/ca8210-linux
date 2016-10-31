@@ -64,6 +64,7 @@
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/poll.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
@@ -282,6 +283,8 @@
 #define CA8210_SFR_LNAGX46                 (0xE7)
 #define CA8210_SFR_LNAGX47                 (0xE9)
 
+#define CA8210_IOCTL_HARD_RESET            (0x00)
+
 /* Structs/Enums */
 
 /**
@@ -324,6 +327,7 @@ struct cas_control {
 struct ca8210_test {
 	struct dentry *ca8210_dfs_spi_int;
 	struct kfifo up_fifo;
+	wait_queue_head_t readq;
 };
 
 /**
@@ -380,6 +384,7 @@ struct ca8210_priv {
 	uint8_t *sync_command_response;
 	atomic_t ca8210_is_awake;
 	int sync_down, sync_up;
+	int spi_errno;
 };
 
 /**
@@ -1195,6 +1200,7 @@ static int ca8210_spi_exchange(
 	int write_retries = 0;
 
 	if (mutex_lock_interruptible(&priv->cas_ctl.spi_mutex)) {
+		priv->spi_errno = status;
 		return -ERESTARTSYS;
 	}
 
@@ -1244,6 +1250,7 @@ static int ca8210_spi_exchange(
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
 
 	if (!((buf[0] & SPI_SYN) && response)) {
+		priv->spi_errno = status;
 		return status;
 	}
 
@@ -1275,10 +1282,12 @@ static int ca8210_spi_exchange(
 			break;
 		}
 	}
+	priv->spi_errno = status;
 	return status;
 
 cleanup:
 	mutex_unlock(&priv->cas_ctl.spi_mutex);
+	priv->spi_errno = status;
 	return status;
 }
 
@@ -2257,6 +2266,13 @@ static void ca8210_async_tx_worker(struct work_struct *work)
 			ret
 		);
 		/* retry transmission higher up */
+		if (priv->spi_errno == -EAGAIN) {
+			dev_crit(
+				&priv->spi->dev,
+				"CA8210 CONSTANTLY NACKING!\n"
+			);
+			return;
+		}
 		ieee802154_wake_queue(priv->hw);
 		return;
 	}
@@ -2890,8 +2906,18 @@ static ssize_t ca8210_test_int_user_read(
 	struct ca8210_priv *priv = filp->private_data;
 	unsigned char *fifo_buffer;
 
-	if (kfifo_is_empty(&priv->test.up_fifo))
-		return 0;
+	if (filp->f_flags & O_NONBLOCK) {
+		/* Non-blocking mode */
+		if (kfifo_is_empty(&priv->test.up_fifo))
+			return 0;
+	} else {
+		/* Blocking mode */
+		wait_event_interruptible(
+			priv->test.readq,
+			!kfifo_is_empty(&priv->test.up_fifo)
+		);
+	}
+
 
 	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, 4) != 4) {
 		dev_err(
@@ -2916,11 +2942,49 @@ static ssize_t ca8210_test_int_user_read(
 	return cmdlen+2;
 }
 
+static long ca8210_test_int_ioctl(
+	struct file *filp,
+	unsigned int ioctl_num,
+	unsigned long ioctl_param
+)
+{
+	struct ca8210_priv *priv = filp->private_data;
+	switch (ioctl_num) {
+	case CA8210_IOCTL_HARD_RESET:
+		ca8210_reset_send(priv->spi, ioctl_param);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static unsigned int ca8210_test_int_poll(
+	struct file *filp,
+	struct poll_table_struct *ptable
+)
+{
+	unsigned int return_flags = 0;
+	struct ca8210_priv *priv = filp->private_data;
+	poll_wait(filp, &priv->test.readq, ptable);
+	if (!kfifo_is_empty(&priv->test.up_fifo)) {
+		return_flags |= (POLLIN | POLLRDNORM);
+	}
+	if (wait_event_interruptible(
+		priv->test.readq,
+		!kfifo_is_empty(&priv->test.up_fifo))) {
+		return POLLERR;
+	}
+	return return_flags;
+}
+
 static const struct file_operations test_int_fops = {
-	.read =     ca8210_test_int_user_read,
-	.write =    ca8210_test_int_user_write,
-	.open =     ca8210_test_int_open,
-	.release =  NULL
+	.read =           ca8210_test_int_user_read,
+	.write =          ca8210_test_int_user_write,
+	.open =           ca8210_test_int_open,
+	.release =        NULL,
+	.unlocked_ioctl = ca8210_test_int_ioctl,
+	.poll =           ca8210_test_int_poll
 };
 
 /* Init/Deinit */
@@ -3326,7 +3390,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		return PTR_ERR(test->ca8210_dfs_spi_int);
 	}
 	debugfs_create_symlink("ca8210", NULL, node_name);
-
+	init_waitqueue_head(&test->readq);
 	return kfifo_alloc(
 		&test->up_fifo,
 		CA8210_TEST_INT_FIFO_SIZE,
