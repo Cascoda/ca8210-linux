@@ -70,6 +70,7 @@
 #include <linux/spi/spi.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+#include <linux/version.h>
 #include <linux/workqueue.h>
 
 #include <net/ieee802154_netdev.h>
@@ -3114,7 +3115,11 @@ static int ca8210_register_ext_clock(struct spi_device *spi)
 	priv->clk = clk_register_fixed_rate(&spi->dev,
 	                                    np->name,
 	                                    NULL,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 6, 0)
+	                                    0,
+#else
 	                                    CLK_IS_ROOT,
+#endif
 	                                    pdata->extclockfreq);
 
 	if (IS_ERR(priv->clk)) {
