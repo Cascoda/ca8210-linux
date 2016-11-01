@@ -3513,6 +3513,9 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
+	priv->spi_errno = 0;
+	priv->sync_up = 0;
+	priv->sync_down = 0;
 	mutex_init(&priv->sync_command_mutex);
 	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
@@ -3592,8 +3595,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 	priv->hw_registered = true;
-	priv->sync_up = 0;
-	priv->sync_down = 0;
 
 	return 0;
 error:
