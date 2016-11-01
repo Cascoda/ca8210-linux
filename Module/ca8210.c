@@ -876,7 +876,6 @@ static int ca8210_spi_read(struct spi_device *spi)
 	int status, i;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
-	struct work_priv_container *rx_wpc;
 
 	dev_dbg(&spi->dev, "ca8210_spi_read called\n");
 
@@ -1004,7 +1003,6 @@ static int ca8210_spi_write(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 	int payload_len = 0;
-	struct work_priv_container *rx_wpc;
 
 	if (spi == NULL) {
 		dev_crit(
@@ -1219,7 +1217,7 @@ static int ca8210_spi_exchange(
 		if (status == -EBUSY) {
 			msleep(1);
 			write_retries++;
-			if (write_retries > 100) {
+			if (write_retries > 20) {
 				dev_err(
 					&spi->dev,
 					"too many retries!\n"
@@ -1425,54 +1423,65 @@ static uint8_t tdme_setsfr_request_sync(
  */
 static uint8_t tdme_chipinit(void *device_ref)
 {
-	uint8_t status;
+	uint8_t status = MAC_SUCCESS;
+	uint8_t sfr_address;
+	struct spi_device *spi = device_ref;
 
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX40, 0x29, device_ref))
-	)  /* LNA Gain Settings */
-		return status;
+		1, (sfr_address = CA8210_SFR_LNAGX40), 0x29, device_ref))
+	) /* LNA Gain Settings */
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX41, 0x54, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX41), 0x54, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX42, 0x6C, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX42), 0x6C, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX43, 0x7A, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX43), 0x7A, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX44, 0x84, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX44), 0x84, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX45, 0x8B, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX45), 0x8B, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX46, 0x92, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX46), 0x92, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_LNAGX47, 0x96, device_ref))
+		1, (sfr_address = CA8210_SFR_LNAGX47), 0x96, device_ref))
 	)
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_PRECFG, 0x5B, device_ref))
+		1, (sfr_address = CA8210_SFR_PRECFG), 0x5B, device_ref))
 	) /* Preamble Timing Config */
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		1, CA8210_SFR_PTHRH, 0x5A, device_ref))
+		1, (sfr_address = CA8210_SFR_PTHRH), 0x5A, device_ref))
 	) /* Preamble Threshold High */
-		return status;
+		goto finish;
 	if ((status = tdme_setsfr_request_sync(
-		0, CA8210_SFR_PACFGIB, 0x3F, device_ref))
+		0, (sfr_address = CA8210_SFR_PACFGIB), 0x3F, device_ref))
 	) /* Tx Output Power 8 dBm */
-		return status;
+		goto finish;
 
-	return MAC_SUCCESS;
+finish:
+	if (status != MAC_SUCCESS) {
+		dev_err(
+			&spi->dev,
+			"failed to set sfr at %#03x, status = %#03x\n",
+			sfr_address,
+			status
+		);
+	}
+	return status;
 }
 
 /**
@@ -2905,6 +2914,7 @@ static ssize_t ca8210_test_int_user_read(
 	int i, cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
 	unsigned char *fifo_buffer;
+	unsigned long bytes_not_copied;
 
 	if (filp->f_flags & O_NONBLOCK) {
 		/* Non-blocking mode */
@@ -2928,7 +2938,16 @@ static ssize_t ca8210_test_int_user_read(
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
-	copy_to_user(buf, fifo_buffer, cmdlen + 2);
+	bytes_not_copied = cmdlen + 2;
+
+	bytes_not_copied = copy_to_user(buf, fifo_buffer, bytes_not_copied);
+	if (bytes_not_copied > 0) {
+		dev_err(
+			&priv->spi->dev,
+			"%lu bytes could not be copied to user space!\n",
+			bytes_not_copied
+		);
+	}
 
 	kfree(fifo_buffer);
 
@@ -3494,6 +3513,9 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
+	priv->spi_errno = 0;
+	priv->sync_up = 0;
+	priv->sync_down = 0;
 	mutex_init(&priv->sync_command_mutex);
 	atomic_set(&priv->ca8210_is_awake, 0);
 	spi_set_drvdata(priv->spi, priv);
@@ -3573,8 +3595,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 		goto error;
 	}
 	priv->hw_registered = true;
-	priv->sync_up = 0;
-	priv->sync_down = 0;
 
 	return 0;
 error:
