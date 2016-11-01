@@ -2903,6 +2903,7 @@ static ssize_t ca8210_test_int_user_read(
 	int i, cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
 	unsigned char *fifo_buffer;
+	unsigned long bytes_not_copied;
 
 	if (filp->f_flags & O_NONBLOCK) {
 		/* Non-blocking mode */
@@ -2926,7 +2927,16 @@ static ssize_t ca8210_test_int_user_read(
 		return 0;
 	}
 	cmdlen = fifo_buffer[1];
-	copy_to_user(buf, fifo_buffer, cmdlen + 2);
+	bytes_not_copied = cmdlen + 2;
+
+	bytes_not_copied = copy_to_user(buf, fifo_buffer, bytes_not_copied);
+	if (bytes_not_copied > 0) {
+		dev_err(
+			&priv->spi->dev,
+			"%lu bytes could not be copied to user space!\n",
+			bytes_not_copied
+		);
+	}
 
 	kfree(fifo_buffer);
 
