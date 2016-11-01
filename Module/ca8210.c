@@ -2582,7 +2582,11 @@ static int ca8210_set_hw_addr_filt(
  *
  * Return: 0 or linux error code
  */
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 1, 0)
 static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
+#else
+static int ca8210_set_tx_power(struct ieee802154_hw *hw, s8 dbm)
+#endif
 {
 	struct ca8210_priv *priv = hw->priv;
 
@@ -3355,7 +3359,6 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 {
 	/* Support channels 11-26 */
-	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
 	ca8210_hw->phy->current_channel = 18;
 	ca8210_hw->phy->current_page = 0;
 	ca8210_hw->phy->transmit_power = 8;
@@ -3365,6 +3368,8 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	ca8210_hw->phy->symbol_duration = 16;
 	ca8210_hw->phy->lifs_period = 40;
 	ca8210_hw->phy->sifs_period = 12;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 1, 0)
+	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
 	ca8210_hw->flags = IEEE802154_HW_AFILT |
 	                   IEEE802154_HW_OMIT_CKSUM |
 	                   IEEE802154_HW_FRAME_RETRIES |
@@ -3372,6 +3377,13 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	ca8210_hw->phy->flags = WPAN_PHY_FLAG_TXPOWER |
 	                        WPAN_PHY_FLAG_CCA_ED_LEVEL |
 	                        WPAN_PHY_FLAG_CCA_MODE;
+#else
+	ca8210_hw->phy->channels_supported[0] = CA8210_VALID_CHANNELS;
+	ca8210_hw->flags = IEEE802154_HW_TXPOWER |
+	                   IEEE802154_HW_AFILT |
+	                   IEEE802154_HW_OMIT_CKSUM |
+	                   IEEE802154_HW_ARET;
+#endif
 }
 
 /**
