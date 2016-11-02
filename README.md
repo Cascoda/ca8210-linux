@@ -1,7 +1,7 @@
 # ca8210-linux
 Linux kernel drivers for Cascoda's CA-8210 IEEE 802.15.4 transceiver.
 
-The master branch supports kernel 4.4.
+The master branch supports kernel 4.8. The backports branch can be built for kernel 4.1 onwards.
 
 Building:
 The Linux kbuild system must be used to build the driver as a kernel module. From [kernel.org](https://www.kernel.org/doc/Documentation/kbuild/modules.txt):
@@ -19,6 +19,10 @@ $ make -C /lib/modules/`uname -r`/build M=$PWD
 *Then to install the module(s) just built, add the target "modules_install" to the command:*
 ```
 $ make -C /lib/modules/`uname -r`/build M=$PWD modules_install
+```
+To enable the debugfs interface you must add the CONFIG_IEEE802154_CA8210_DEBUGFS flag to the module's CFLAGS when building the module, i.e.
+```
+$ make CFLAGS_ca8210.o:=-DCONFIG_IEEE802154_CA8210_DEBUGFS=1 -C /lib/modules/`uname -r`/build M=$PWD
 ```
 The built module can be found at /lib/modules/\`uname -r\`/extra/**ca8210sm** and can be loaded with the command  
 ```
