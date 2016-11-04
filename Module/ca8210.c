@@ -635,6 +635,7 @@ static int ca8210_test_int_driver_write(
 
 	fifo_buffer = kmalloc(len, GFP_KERNEL);
 	memcpy(fifo_buffer, buf, len);
+	wake_up_interruptible(priv->test.readq);
 	kfifo_in(&test->up_fifo, &fifo_buffer, 4);
 
 	return 0;
