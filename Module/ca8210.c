@@ -3361,7 +3361,6 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	/* Support channels 11-26 */
 	ca8210_hw->phy->current_channel = 18;
 	ca8210_hw->phy->current_page = 0;
-	ca8210_hw->phy->transmit_power = 800;
 	ca8210_hw->phy->cca.mode = NL802154_CCA_ENERGY_CARRIER;
 	ca8210_hw->phy->cca.opt = NL802154_CCA_OPT_ENERGY_CARRIER_AND;
 	ca8210_hw->phy->cca_ed_level = 0x3C;
@@ -3369,6 +3368,7 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	ca8210_hw->phy->lifs_period = 40;
 	ca8210_hw->phy->sifs_period = 12;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 1, 0)
+	ca8210_hw->phy->transmit_power = 800;
 	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
 	ca8210_hw->flags = IEEE802154_HW_AFILT |
 	                   IEEE802154_HW_OMIT_CKSUM |
@@ -3378,6 +3378,7 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	                        WPAN_PHY_FLAG_CCA_ED_LEVEL |
 	                        WPAN_PHY_FLAG_CCA_MODE;
 #else
+	ca8210_hw->phy->transmit_power = 8;
 	ca8210_hw->phy->channels_supported[0] = CA8210_VALID_CHANNELS;
 	ca8210_hw->flags = IEEE802154_HW_TXPOWER |
 	                   IEEE802154_HW_AFILT |
