@@ -3351,6 +3351,18 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 	priv->cas_ctl.rx_final_buf = NULL;
 }
 
+#define CA8210_MAX_TX_POWERS (9)
+static const int32_t ca8210_tx_powers[CA8210_MAX_TX_POWERS] = {
+	800, 700, 600, 500, 400, 300, 200, 100, 0
+};
+
+#define CA8210_MAX_ED_LEVELS (21)
+static const int32_t ca8210_ed_levels[CA8210_MAX_ED_LEVELS] = {
+	-10300, -10250, -10200, -10150, -10100, -10050, -10000, -9950, -9900,
+	-9850, -9800, -9750, -9700, -9650, -9600, -9550, -9500, -9450, -9400,
+	-9350, -9300
+};
+
 /**
  * ca8210_hw_setup() - Populate the ieee802154_hw phy attributes with the
  *                     ca8210's defaults
@@ -3363,13 +3375,17 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 	ca8210_hw->phy->current_page = 0;
 	ca8210_hw->phy->cca.mode = NL802154_CCA_ENERGY_CARRIER;
 	ca8210_hw->phy->cca.opt = NL802154_CCA_OPT_ENERGY_CARRIER_AND;
-	ca8210_hw->phy->cca_ed_level = 0x3C;
+	ca8210_hw->phy->cca_ed_level = -9800;
 	ca8210_hw->phy->symbol_duration = 16;
 	ca8210_hw->phy->lifs_period = 40;
 	ca8210_hw->phy->sifs_period = 12;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 1, 0)
 	ca8210_hw->phy->transmit_power = 800;
 	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
+	ca8210_hw->phy->supported.tx_powers_size = CA8210_MAX_TX_POWERS;
+	ca8210_hw->phy->supported.tx_powers = ca8210_tx_powers;
+	ca8210_hw->phy->supported.cca_ed_levels_size = CA8210_MAX_ED_LEVELS;
+	ca8210_hw->phy->supported.cca_ed_levels = ca8210_ed_levels;
 	ca8210_hw->flags = IEEE802154_HW_AFILT |
 	                   IEEE802154_HW_OMIT_CKSUM |
 	                   IEEE802154_HW_FRAME_RETRIES |
