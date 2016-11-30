@@ -2575,16 +2575,17 @@ static int ca8210_set_hw_addr_filt(
 /**
  * ca8210_set_tx_power() - Sets the transmit power of the ca8210
  * @hw:   ieee802154_hw of target ca8210
- * @dbm:  Transmit power in dBm
+ * @mbm:  Transmit power in mBm (dBm*100)
  *
  * Return: 0 or linux error code
  */
-static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 dbm)
+static int ca8210_set_tx_power(struct ieee802154_hw *hw, s32 mbm)
 {
 	struct ca8210_priv *priv = hw->priv;
 
+	mbm /= 100;
 	return link_to_linux_err(
-		mlme_set_request_sync(PHY_TRANSMIT_POWER, 0, 1, &dbm, priv->spi)
+		mlme_set_request_sync(PHY_TRANSMIT_POWER, 0, 1, &mbm, priv->spi)
 	);
 }
 
@@ -2630,7 +2631,7 @@ static int ca8210_set_cca_mode(
 /**
  * ca8210_set_cca_ed_level() - Sets the CCA ED level of the ca8210
  * @hw:     ieee802154_hw of target ca8210
- * @level:  ED level to set
+ * @level:  ED level to set (in mbm)
  *
  * Sets the minimum threshold of measured energy above which the ca8210 will
  * back off and retry a transmission.
@@ -2640,7 +2641,7 @@ static int ca8210_set_cca_mode(
 static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, s32 level)
 {
 	u8 status;
-	u8 ed_threshold = level * 2 + 256;
+	u8 ed_threshold = (level/100) * 2 + 256;
 	struct ca8210_priv *priv = hw->priv;
 
 	status = hwme_set_request_sync(
