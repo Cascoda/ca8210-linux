@@ -3510,7 +3510,9 @@ static int ca8210_remove(struct spi_device *spi_device)
 				"Unregistered & freed ieee802154_hw.\n"
 			);
 		}
-		ca8210_test_interface_clear(priv);
+		if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
+			ca8210_test_interface_clear(priv);
+		}
 	}
 
 	return 0;
