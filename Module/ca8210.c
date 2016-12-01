@@ -277,6 +277,17 @@
 #define CA8210_SFR_LNAGX46                 (0xE7)
 #define CA8210_SFR_LNAGX47                 (0xE9)
 
+#define PACFGIB_DEFAULT_CURRENT            (0x3F)
+#define PTHRH_DEFAULT_THRESHOLD            (0x5A)
+#define LNAGX40_DEFAULT_GAIN               (0x29) /* 10dB */
+#define LNAGX41_DEFAULT_GAIN               (0x54) /* 21dB */
+#define LNAGX42_DEFAULT_GAIN               (0x6C) /* 27dB */
+#define LNAGX43_DEFAULT_GAIN               (0x7A) /* 30dB */
+#define LNAGX44_DEFAULT_GAIN               (0x84) /* 33dB */
+#define LNAGX45_DEFAULT_GAIN               (0x8B) /* 34dB */
+#define LNAGX46_DEFAULT_GAIN               (0x92) /* 36dB */
+#define LNAGX47_DEFAULT_GAIN               (0x96) /* 37dB */
+
 #define CA8210_IOCTL_HARD_RESET            (0x00)
 
 /* Structs/Enums */
@@ -519,6 +530,22 @@ struct mac_message {
 		u8                             status;
 		u8                             payload[254];
 	} pdata;
+};
+
+union pa_cfg_sfr {
+	struct {
+		u8 bias_current_trim     : 3;
+		u8 /* reserved */        : 1;
+		u8 buffer_capacitor_trim : 3;
+		u8 boost                 : 1;
+	};
+	u8 paib;
+};
+
+struct preamble_cfg_sfr {
+	u8 timeout_symbols      : 3;
+	u8 acquisition_symbols  : 3;
+	u8 search_symbols       : 2;
 };
 
 static int (*cascoda_api_upstream)(
@@ -1412,52 +1439,68 @@ static u8 tdme_chipinit(void *device_ref)
 	u8 status = MAC_SUCCESS;
 	u8 sfr_address;
 	struct spi_device *spi = device_ref;
+	struct preamble_cfg_sfr pre_cfg_value = {
+		.timeout_symbols     = 3,
+		.acquisition_symbols = 3,
+		.search_symbols      = 1,
+	};
 	/* LNA Gain Settings */
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX40), 0x29, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX40),
+		LNAGX40_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX41), 0x54, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX41),
+		LNAGX41_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX42), 0x6C, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX42),
+		LNAGX42_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX43), 0x7A, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX43),
+		LNAGX43_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX44), 0x84, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX44),
+		LNAGX44_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX45), 0x8B, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX45),
+		LNAGX45_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX46), 0x92, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX46),
+		LNAGX46_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_LNAGX47), 0x96, device_ref);
+		1, (sfr_address = CA8210_SFR_LNAGX47),
+		LNAGX47_DEFAULT_GAIN, device_ref);
 	if (status)
 		goto finish;
 	/* Preamble Timing Config */
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_PRECFG), 0x5B, device_ref);
+		1, (sfr_address = CA8210_SFR_PRECFG),
+		*((u8*)&pre_cfg_value), device_ref);
 	if (status)
 		goto finish;
 	/* Preamble Threshold High */
 	status = tdme_setsfr_request_sync(
-		1, (sfr_address = CA8210_SFR_PTHRH), 0x5A, device_ref);
+		1, (sfr_address = CA8210_SFR_PTHRH),
+		PTHRH_DEFAULT_THRESHOLD, device_ref);
 	if (status)
 		goto finish;
 	/* Tx Output Power 8 dBm */
 	status = tdme_setsfr_request_sync(
-		0, (sfr_address = CA8210_SFR_PACFGIB), 0x3F, device_ref);
+		0, (sfr_address = CA8210_SFR_PACFGIB),
+		PACFGIB_DEFAULT_CURRENT, device_ref);
 	if (status)
 		goto finish;
 
@@ -1482,6 +1525,9 @@ finish:
  */
 static u8 tdme_channelinit(u8 channel, void *device_ref)
 {
+	/* Transceiver front-end local oscillator tx two-point calibration
+	 * value. Tuned for the hardware.
+	 */
 	u8 txcalval;
 
 	if (channel >= 25)
@@ -1627,7 +1673,7 @@ static u8 tdme_settxpower(u8 txp, void *device_ref)
 	u8 status;
 	int8_t txp_val;
 	u8 txp_ext;
-	u8 paib;
+	union pa_cfg_sfr pa_cfg_val;
 
 	/* extend from 6 to 8 bit */
 	txp_ext = 0x3F & txp;
@@ -1638,16 +1684,20 @@ static u8 tdme_settxpower(u8 txp, void *device_ref)
 	if (CA8210_MAC_MPW) {
 		if (txp_val > 0) {
 			/* 8 dBm: ptrim = 5, itrim = +3 => +4 dBm */
-			paib = 0xD3;
+			pa_cfg_val.bias_current_trim     = 3;
+			pa_cfg_val.buffer_capacitor_trim = 5;
+			pa_cfg_val.boost                 = 1;
 		} else {
 			/* 0 dBm: ptrim = 7, itrim = +3 => -6 dBm */
-			paib = 0x73;
+			pa_cfg_val.bias_current_trim     = 3;
+			pa_cfg_val.buffer_capacitor_trim = 7;
+			pa_cfg_val.boost                 = 0;
 		}
 		/* write PACFG */
 		status = tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_PACFG,
-			paib,
+			pa_cfg_val.paib,
 			device_ref
 		);
 	} else {
@@ -1655,33 +1705,33 @@ static u8 tdme_settxpower(u8 txp, void *device_ref)
 		 * for desired Output Power
 		 */
 		if (txp_val > 8) {
-			paib = 0x3F;
+			pa_cfg_val.paib = 0x3F;
 		} else if (txp_val == 8) {
-			paib = 0x32;
+			pa_cfg_val.paib = 0x32;
 		} else if (txp_val == 7) {
-			paib = 0x22;
+			pa_cfg_val.paib = 0x22;
 		} else if (txp_val == 6) {
-			paib = 0x18;
+			pa_cfg_val.paib = 0x18;
 		} else if (txp_val == 5) {
-			paib = 0x10;
+			pa_cfg_val.paib = 0x10;
 		} else if (txp_val == 4) {
-			paib = 0x0C;
+			pa_cfg_val.paib = 0x0C;
 		} else if (txp_val == 3) {
-			paib = 0x08;
+			pa_cfg_val.paib = 0x08;
 		} else if (txp_val == 2) {
-			paib = 0x05;
+			pa_cfg_val.paib = 0x05;
 		} else if (txp_val == 1) {
-			paib = 0x03;
+			pa_cfg_val.paib = 0x03;
 		} else if (txp_val == 0) {
-			paib = 0x01;
+			pa_cfg_val.paib = 0x01;
 		} else { /* < 0 */
-			paib = 0x00;
+			pa_cfg_val.paib = 0x00;
 		}
 		/* write PACFGIB */
 		status = tdme_setsfr_request_sync(
 			0,
 			CA8210_SFR_PACFGIB,
-			paib,
+			pa_cfg_val.paib,
 			device_ref
 		);
 	}
