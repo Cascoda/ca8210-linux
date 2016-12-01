@@ -659,13 +659,10 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long startjiffies;
 
-	#define RESET_OFF 0
-	#define RESET_ON 1
-
-	gpio_set_value(pdata->gpio_reset, RESET_OFF);
+	gpio_set_value(pdata->gpio_reset, 0);
 	atomic_set(&priv->ca8210_is_awake, 0);
 	msleep(ms);
-	gpio_set_value(pdata->gpio_reset, RESET_ON);
+	gpio_set_value(pdata->gpio_reset, 1);
 
 	/* Wait until wakeup indication seen */
 	startjiffies = jiffies;
@@ -682,8 +679,6 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 	}
 
 	dev_dbg(&spi->dev, "Reset the device\n");
-	#undef RESET_OFF
-	#undef RESET_ON
 }
 
 /**
@@ -1725,29 +1720,32 @@ static u8 mcps_data_request(
 	struct secspec *psec;
 	struct mac_message command;
 
-	#define DATAREQ (command.pdata.data_req)
 	command.command_id = SPI_MCPS_DATA_REQUEST;
-	DATAREQ.src_addr_mode = src_addr_mode;
-	DATAREQ.dst.mode = dst_address_mode;
+	command.pdata.data_req.src_addr_mode = src_addr_mode;
+	command.pdata.data_req.dst.mode = dst_address_mode;
 	if (dst_address_mode != MAC_MODE_NO_ADDR) {
-		DATAREQ.dst.pan_id[0] = LS_BYTE(dst_pan_id);
-		DATAREQ.dst.pan_id[1] = MS_BYTE(dst_pan_id);
+		command.pdata.data_req.dst.pan_id[0] = LS_BYTE(dst_pan_id);
+		command.pdata.data_req.dst.pan_id[1] = MS_BYTE(dst_pan_id);
 		if (dst_address_mode == MAC_MODE_SHORT_ADDR) {
-			DATAREQ.dst.address[0] = LS_BYTE(
+			command.pdata.data_req.dst.address[0] = LS_BYTE(
 				dst_addr->short_address
 			);
-			DATAREQ.dst.address[1] = MS_BYTE(
+			command.pdata.data_req.dst.address[1] = MS_BYTE(
 				dst_addr->short_address
 			);
 		} else {   /* MAC_MODE_LONG_ADDR*/
-			memcpy(DATAREQ.dst.address, dst_addr->ieee_address, 8);
+			memcpy(
+				command.pdata.data_req.dst.address,
+				dst_addr->ieee_address,
+				8
+			);
 		}
 	}
-	DATAREQ.msdu_length = msdu_length;
-	DATAREQ.msdu_handle = msdu_handle;
-	DATAREQ.tx_options = tx_options;
-	memcpy(DATAREQ.msdu, msdu, msdu_length);
-	psec = (struct secspec *)(DATAREQ.msdu + msdu_length);
+	command.pdata.data_req.msdu_length = msdu_length;
+	command.pdata.data_req.msdu_handle = msdu_handle;
+	command.pdata.data_req.tx_options = tx_options;
+	memcpy(command.pdata.data_req.msdu, msdu, msdu_length);
+	psec = (struct secspec *)(command.pdata.data_req.msdu + msdu_length);
 	command.length = sizeof(struct mcps_data_request_pset) -
 		MAX_DATA_SIZE + msdu_length;
 	if ((security == NULL) || (security->security_level == 0)) {
@@ -1764,7 +1762,6 @@ static u8 mcps_data_request(
 		return MAC_SYSTEM_ERROR;
 
 	return MAC_SUCCESS;
-	#undef DATAREQ
 }
 
 /**
@@ -1783,11 +1780,9 @@ static u8 mlme_reset_request_sync(
 	struct mac_message command, response;
 	struct spi_device *spi = device_ref;
 
-	#define SIMPLEREQ (command.pdata)
-	#define SIMPLECNF (response.pdata)
 	command.command_id = SPI_MLME_RESET_REQUEST;
 	command.length = 1;
-	SIMPLEREQ.u8param = set_default_pib;
+	command.pdata.u8param = set_default_pib;
 
 	if (cascoda_api_downstream(
 		&command.command_id,
@@ -1801,7 +1796,7 @@ static u8 mlme_reset_request_sync(
 	if (response.command_id != SPI_MLME_RESET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
 
-	status = SIMPLECNF.status;
+	status = response.pdata.status;
 
 	/* reset COORD Bit for Channel Filtering as Coordinator */
 	if (CA8210_MAC_WORKAROUNDS && set_default_pib && (!status)) {
@@ -1814,8 +1809,6 @@ static u8 mlme_reset_request_sync(
 	}
 
 	return status;
-	#undef SIMPLEREQ
-	#undef SIMPLECNF
 }
 
 /**
@@ -1839,8 +1832,6 @@ static u8 mlme_set_request_sync(
 	u8 status;
 	struct mac_message command, response;
 
-	#define SETREQ    (command.pdata.set_req)
-	#define SIMPLECNF (response.pdata)
 	/* pre-check the validity of pib_attribute values that are not checked
 	 * in MAC
 	 */
@@ -1869,11 +1860,11 @@ static u8 mlme_set_request_sync(
 	command.command_id = SPI_MLME_SET_REQUEST;
 	command.length = sizeof(struct mlme_set_request_pset) -
 		MAX_ATTRIBUTE_SIZE + pib_attribute_length;
-	SETREQ.pib_attribute = pib_attribute;
-	SETREQ.pib_attribute_index = pib_attribute_index;
-	SETREQ.pib_attribute_length = pib_attribute_length;
+	command.pdata.set_req.pib_attribute = pib_attribute;
+	command.pdata.set_req.pib_attribute_index = pib_attribute_index;
+	command.pdata.set_req.pib_attribute_length = pib_attribute_length;
 	memcpy(
-		SETREQ.pib_attribute_value,
+		command.pdata.set_req.pib_attribute_value,
 		pib_attribute_value,
 		pib_attribute_length
 	);
@@ -1889,9 +1880,7 @@ static u8 mlme_set_request_sync(
 	if (response.command_id != SPI_MLME_SET_CONFIRM)
 		return MAC_SYSTEM_ERROR;
 
-	return SIMPLECNF.status;
-	#undef SETREQ
-	#undef SIMPLECNF
+	return response.pdata.status;
 }
 
 /**
