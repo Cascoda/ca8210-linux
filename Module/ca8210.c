@@ -464,12 +464,12 @@ struct secspec {
 
 /* downlink functions parameter set definitions */
 struct mcps_data_request_pset {
-	u8         src_addr_mode;
+	u8              src_addr_mode;
 	struct fulladdr dst;
-	u8         msdu_length;
-	u8         msdu_handle;
-	u8         tx_options;
-	u8         msdu[MAX_DATA_SIZE];
+	u8              msdu_length;
+	u8              msdu_handle;
+	u8              tx_options;
+	u8              msdu[MAX_DATA_SIZE];
 };
 
 struct mlme_set_request_pset {
@@ -636,7 +636,7 @@ static int link_to_linux_err(int link_status)
  * Return: 0 or linux error code
  */
 static int ca8210_test_int_driver_write(
-	const u8  *buf,
+	const u8       *buf,
 	size_t          len,
 	void           *spi
 )
@@ -667,11 +667,11 @@ static int ca8210_test_int_driver_write(
 static int ca8210_spi_write_dummy(struct spi_device *spi);
 static int ca8210_net_rx(
 	struct ieee802154_hw  *hw,
-	u8               *command,
+	u8                    *command,
 	size_t                 len
 );
 static u8 mlme_reset_request_sync(
-	u8  set_default_pib,
+	u8       set_default_pib,
 	void    *device_ref
 );
 
@@ -1006,7 +1006,7 @@ error:
  */
 static int ca8210_spi_write(
 	struct spi_device  *spi,
-	const u8      *buf,
+	const u8           *buf,
 	size_t              len
 )
 {
@@ -1388,9 +1388,9 @@ static int (*cascoda_api_downstream)(
  * Return: 802.15.4 status code of TDME-SETSFR.confirm
  */
 static u8 tdme_setsfr_request_sync(
-	u8      sfr_page,
-	u8      sfr_address,
-	u8      sfr_value,
+	u8            sfr_page,
+	u8            sfr_address,
+	u8            sfr_value,
 	void         *device_ref
 )
 {
@@ -1568,8 +1568,8 @@ static u8 tdme_channelinit(u8 channel, void *device_ref)
  * Return: 802.15.4 status code of checks
  */
 static u8 tdme_checkpibattribute(
-	u8      pib_attribute,
-	u8      pib_attribute_length,
+	u8            pib_attribute,
+	u8            pib_attribute_length,
 	const void   *pib_attribute_value
 )
 {
@@ -1872,9 +1872,9 @@ static u8 mlme_reset_request_sync(
  * Return: 802.15.4 status code of MLME-SET.confirm
  */
 static u8 mlme_set_request_sync(
-	u8       pib_attribute,
-	u8       pib_attribute_index,
-	u8       pib_attribute_length,
+	u8            pib_attribute,
+	u8            pib_attribute_index,
+	u8            pib_attribute_length,
 	const void   *pib_attribute_value,
 	void         *device_ref
 )
@@ -1943,9 +1943,9 @@ static u8 mlme_set_request_sync(
  * Return: 802.15.4 status code of HWME-SET.confirm
  */
 static u8 hwme_set_request_sync(
-	u8      hw_attribute,
-	u8      hw_attribute_length,
-	u8     *hw_attribute_value,
+	u8           hw_attribute,
+	u8           hw_attribute_length,
+	u8          *hw_attribute_value,
 	void        *device_ref
 )
 {
@@ -1985,9 +1985,9 @@ static u8 hwme_set_request_sync(
  * Return: 802.15.4 status code of HWME-GET.confirm
  */
 static u8 hwme_get_request_sync(
-	u8      hw_attribute,
-	u8     *hw_attribute_length,
-	u8     *hw_attribute_value,
+	u8           hw_attribute,
+	u8          *hw_attribute_length,
+	u8          *hw_attribute_value,
 	void        *device_ref
 )
 {
@@ -2034,8 +2034,8 @@ static u8 hwme_get_request_sync(
  */
 static int ca8210_async_xmit_complete(
 	struct ieee802154_hw  *hw,
-	u8                msduhandle,
-	u8                status)
+	u8                     msduhandle,
+	u8                     status)
 {
 	struct ca8210_priv *priv = hw->priv;
 	unsigned long flags;
@@ -2099,7 +2099,7 @@ static int ca8210_async_xmit_complete(
 static int ca8210_skb_rx(
 	struct ieee802154_hw  *hw,
 	size_t                 len,
-	u8               *data_ind
+	u8                    *data_ind
 )
 {
 	struct ieee802154_hdr hdr;
@@ -2243,7 +2243,7 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, u8 *command, size_t len)
  */
 static int ca8210_skb_tx(
 	struct sk_buff      *skb,
-	u8              msduhandle,
+	u8                   msduhandle,
 	struct ca8210_priv  *priv
 )
 {
@@ -2509,8 +2509,8 @@ static int ca8210_get_ed(struct ieee802154_hw *hw, u8 *level)
  */
 static int ca8210_set_channel(
 	struct ieee802154_hw  *hw,
-	u8                page,
-	u8                channel
+	u8                     page,
+	u8                     channel
 )
 {
 	u8 status;
@@ -2711,9 +2711,9 @@ static int ca8210_set_cca_ed_level(struct ieee802154_hw *hw, s32 level)
  */
 static int ca8210_set_csma_params(
 	struct ieee802154_hw  *hw,
-	u8                min_be,
-	u8                max_be,
-	u8                retries
+	u8                     min_be,
+	u8                     max_be,
+	u8                     retries
 )
 {
 	u8 status;
