@@ -2875,7 +2875,7 @@ static ssize_t ca8210_test_int_user_write(
 	if (len > CA8210_SPI_BUF_SIZE) {
 		dev_warn(
 			&priv->spi->dev,
-			"userspace requested erroneously long write (%d)\n",
+			"userspace requested erroneously long write (%zu)\n",
 			len
 		);
 		return -EMSGSIZE;
