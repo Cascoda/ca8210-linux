@@ -2878,10 +2878,10 @@ static int ca8210_test_check_upstream(u8 *buf, void *device_ref)
  * Return: 0 or linux error code
  */
 static ssize_t ca8210_test_int_user_write(
-	struct file  *filp,
-	const char   *in_buf,
-	size_t        len,
-	loff_t       *off
+	struct file        *filp,
+	const char __user  *in_buf,
+	size_t              len,
+	loff_t             *off
 )
 {
 	int ret;
@@ -2891,7 +2891,7 @@ static ssize_t ca8210_test_int_user_write(
 	if (len > CA8210_SPI_BUF_SIZE) {
 		dev_warn(
 			&priv->spi->dev,
-			"userspace requested erroneously long write (%d)\n",
+			"userspace requested erroneously long write (%zu)\n",
 			len
 		);
 		return -EMSGSIZE;
