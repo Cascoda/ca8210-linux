@@ -2971,13 +2971,13 @@ static ssize_t ca8210_test_int_user_read(
 		);
 	}
 
-	kfree(fifo_buffer);
-
 	dev_dbg(&priv->spi->dev, "test_interface: Cmd len = %d\n", cmdlen);
 
 	dev_dbg(&priv->spi->dev, "test_interface: Read\n");
 	for (i = 0; i < cmdlen + 2; i++)
-		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
+		dev_dbg(&priv->spi->dev, "%#03x\n", fifo_buffer[i]);
+
+	kfree(fifo_buffer);
 
 	return cmdlen + 2;
 }
