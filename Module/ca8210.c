@@ -180,9 +180,8 @@
 #define MAC_MODE_LONG_ADDR              (0x03)
 
 /* MAC constants */
-#define MAX_PHY_PACKET_SIZE        (127)
 #define MAX_BEACON_OVERHEAD        (75)
-#define MAX_BEACON_PAYLOAD_LENGTH  (MAX_PHY_PACKET_SIZE - MAX_BEACON_OVERHEAD)
+#define MAX_BEACON_PAYLOAD_LENGTH  (IEEE802154_MTU - MAX_BEACON_OVERHEAD)
 
 #define MAX_ATTRIBUTE_SIZE              (250)
 #define MAX_DATA_SIZE                   (114)
@@ -2101,7 +2100,7 @@ static int ca8210_skb_rx(
 	skb_reserve(skb, sizeof(hdr));
 
 	msdulen = data_ind[22]; /* msdu_length */
-	if (msdulen > 127) {
+	if (msdulen > IEEE802154_MTU) {
 		dev_err(
 			&priv->spi->dev,
 			"received erroneously large msdu length!\n"
