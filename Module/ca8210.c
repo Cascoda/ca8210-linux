@@ -525,9 +525,9 @@ struct mac_message {
 		struct hwme_set_confirm_pset        hwme_set_cnf;
 		struct hwme_get_confirm_pset        hwme_get_cnf;
 		struct tdme_setsfr_confirm_pset     tdme_set_sfr_cnf;
-		u8                             u8param;
-		u8                             status;
-		u8                             payload[254];
+		u8                                  u8param;
+		u8                                  status;
+		u8                                  payload[254];
 	} pdata;
 };
 
