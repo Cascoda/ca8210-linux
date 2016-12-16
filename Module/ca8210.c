@@ -662,7 +662,6 @@ static int ca8210_test_int_driver_write(
 
 /* SPI Operation */
 
-static int ca8210_spi_write_dummy(struct spi_device *spi);
 static int ca8210_net_rx(
 	struct ieee802154_hw  *hw,
 	u8                    *command,
@@ -875,7 +874,7 @@ finish:;
  */
 static int ca8210_spi_read(struct spi_device *spi)
 {
-	int status, i;
+	int status = 0, i;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
 
@@ -896,12 +895,9 @@ static int ca8210_spi_read(struct spi_device *spi)
 	memset(priv->cas_ctl.rx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 	memset(priv->cas_ctl.rx_out_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	/* Read the first 2 bytes: CMD and LENGTH */
 	priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
 	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
-	priv->cas_ctl.rx_transfer.len = 2;
-	/* Keep chip select asserted after reading the bytes */
-	priv->cas_ctl.rx_transfer.cs_change = 1;
+	priv->cas_ctl.rx_transfer.len = CA8210_SPI_BUF_SIZE;
 	priv->cas_ctl.rx_transfer.delay_usecs = 0;
 	spi_message_init(&priv->cas_ctl.rx_msg);
 	spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
@@ -913,7 +909,7 @@ static int ca8210_spi_read(struct spi_device *spi)
 			"status %d from spi_sync in read\n",
 			status
 		);
-		goto error;
+		goto finish;
 	}
 
 	dev_dbg(
@@ -925,41 +921,18 @@ static int ca8210_spi_read(struct spi_device *spi)
 
 	if (priv->cas_ctl.rx_buf[0] == SPI_IDLE) {
 		status = -EBADE;
-		goto error;
+		goto finish;
 	} else if (priv->cas_ctl.rx_buf[0] == SPI_NACK) {
 		status = -EBUSY;
-		goto error;
-	}
-
-	priv->cas_ctl.rx_final_buf[0] = priv->cas_ctl.rx_buf[0];
-	priv->cas_ctl.rx_final_buf[1] = priv->cas_ctl.rx_buf[1];
-
-	spi_message_init(&priv->cas_ctl.rx_msg);
-
-	priv->cas_ctl.rx_transfer.tx_buf = priv->cas_ctl.rx_out_buf;
-	priv->cas_ctl.rx_transfer.rx_buf = priv->cas_ctl.rx_buf;
-	priv->cas_ctl.rx_transfer.len = priv->cas_ctl.rx_final_buf[1];
-	priv->cas_ctl.rx_transfer.cs_change = 0;
-	priv->cas_ctl.rx_transfer.delay_usecs = 0;
-
-	spi_message_add_tail(&priv->cas_ctl.rx_transfer, &priv->cas_ctl.rx_msg);
-
-	status = spi_sync(spi, &priv->cas_ctl.rx_msg);
-
-	if (status) {
-		dev_crit(
-			&spi->dev,
-			"status %d from spi_sync in read\n",
-			status
-		);
-		goto error;
+		goto finish;
 	}
 
 	spin_lock_irqsave(&priv->lock, flags);
-
-	for (i = 0; i < priv->cas_ctl.rx_final_buf[1]; i++)
-		priv->cas_ctl.rx_final_buf[2 + i] = priv->cas_ctl.rx_buf[i];
-
+	memcpy(
+		priv->cas_ctl.rx_final_buf,
+		priv->cas_ctl.rx_buf,
+		CA8210_SPI_BUF_SIZE
+	);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	dev_dbg(
@@ -968,15 +941,12 @@ static int ca8210_spi_read(struct spi_device *spi)
 		priv->cas_ctl.rx_final_buf[0],
 		priv->cas_ctl.rx_final_buf[1]
 	);
-
 	for (i = 2; i < priv->cas_ctl.rx_final_buf[1] + 2; i++)
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.rx_final_buf[i]);
 
 	ca8210_rx_done(priv);
-	return 0;
 
-error:
-	ca8210_spi_write_dummy(spi);
+finish:
 	return status;
 }
 
@@ -999,7 +969,6 @@ static int ca8210_spi_write(
 	bool dummy, duplex_rx = false;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	unsigned long flags;
-	int payload_len = 0;
 
 	if (!spi) {
 		dev_crit(
@@ -1037,18 +1006,8 @@ static int ca8210_spi_write(
 	priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf;
 	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
 	priv->cas_ctl.tx_transfer.delay_usecs = 0;
-
-	if (!dummy) {
-		/* Regular transmission, keep CS asserted in case of
-		 * incomplete concurrent read
-		 */
-		priv->cas_ctl.tx_transfer.cs_change = 1;
-		priv->cas_ctl.tx_transfer.len = 2;
-	} else {
-		/* dummy transmission, de-assert CS */
-		priv->cas_ctl.tx_transfer.cs_change = 0;
-		priv->cas_ctl.tx_transfer.len = len;
-	}
+	priv->cas_ctl.tx_transfer.cs_change = 0;
+	priv->cas_ctl.tx_transfer.len = CA8210_SPI_BUF_SIZE;
 
 	spi_message_add_tail(
 		&priv->cas_ctl.tx_transfer,
@@ -1069,7 +1028,6 @@ static int ca8210_spi_write(
 	) {
 		/* ca8210 is busy */
 		dev_info(&spi->dev, "ca8210 was busy during attempted write\n");
-		ca8210_spi_write_dummy(spi);
 		return -EBUSY;
 	} else if (!dummy) {
 		if (
@@ -1092,36 +1050,10 @@ static int ca8210_spi_write(
 				spin_unlock_irqrestore(&priv->lock, flags);
 				msleep(1);
 			} while (1);
-			priv->cas_ctl.rx_final_buf[0] =
-				priv->cas_ctl.tx_in_buf[0];
-			priv->cas_ctl.rx_final_buf[1] =
-				priv->cas_ctl.tx_in_buf[1];
-		}
-		spi_message_init(&priv->cas_ctl.tx_msg);
-
-		priv->cas_ctl.tx_transfer.tx_buf = priv->cas_ctl.tx_buf + 2;
-		priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf + 2;
-		priv->cas_ctl.tx_transfer.delay_usecs = 0;
-		priv->cas_ctl.tx_transfer.cs_change = 0;
-
-		if (duplex_rx &&
-		    priv->cas_ctl.tx_in_buf[1] > priv->cas_ctl.tx_buf[1]) {
-			payload_len = priv->cas_ctl.tx_in_buf[1];
-		} else {
-			payload_len = priv->cas_ctl.tx_buf[1];
-		}
-		priv->cas_ctl.tx_transfer.len = payload_len;
-		spi_message_add_tail(
-			&priv->cas_ctl.tx_transfer,
-			&priv->cas_ctl.tx_msg
-		);
-
-		status = spi_sync(spi, &priv->cas_ctl.tx_msg);
-		if (status < 0) {
-			dev_crit(
-				&spi->dev,
-				"status %d from spi_sync in write\n",
-				status
+			memcpy(
+				priv->cas_ctl.rx_final_buf,
+				priv->cas_ctl.tx_in_buf,
+				CA8210_SPI_BUF_SIZE
 			);
 		}
 	}
@@ -1130,44 +1062,14 @@ static int ca8210_spi_write(
 		return status;
 
 	dev_dbg(&spi->dev, "spi received during transfer:\n");
-	for (i = 0; i < payload_len + 2; i++)
+	for (i = 0; i < priv->cas_ctl.tx_in_buf[1] + 2; i++)
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_in_buf[i]);
 
 	if (duplex_rx) {
 		dev_dbg(&spi->dev, "READ CMD DURING TX\n");
-		memcpy(
-			priv->cas_ctl.rx_final_buf + 2,
-			priv->cas_ctl.tx_in_buf + 2,
-			priv->cas_ctl.rx_final_buf[1]
-		);
 		ca8210_rx_done(priv);
 	}
 	return status;
-}
-
-/**
- * ca8210_spi_write_dummy() - Write a "dummy" packet to the ca8210
- * @spi:  Pointer to spi device to write to
- *
- * This functions exists solely to toggle the spi chip select to the ca8210. The
- * ca8210 sends and receives variable length spi packets to its host processor.
- * This means the chip select must be held asserted inbetween processing
- * individual bytes of messages. Using the current spi framework the only way to
- * toggle the chip select is through an spi transfer so this functions writes
- * an "IDLE" 0xFF byte to the ca8210 for the sole purpose of de-asserting the
- * chip select when an exchange is complete.
- *
- * Return: 0 or linux error code
- */
-static int ca8210_spi_write_dummy(struct spi_device *spi)
-{
-	int ret;
-	u8 idle = SPI_IDLE;
-
-	dev_dbg(&spi->dev, "spi: writing dummy packet\n");
-	ret =  ca8210_spi_write(spi, &idle, 1);
-	dev_dbg(&spi->dev, "spi: wrote dummy packet\n");
-	return ret;
 }
 
 /**
