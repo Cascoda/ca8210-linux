@@ -386,7 +386,7 @@ struct ca8210_priv {
 	bool sync_command_pending;
 	struct mutex sync_command_mutex;
 	u8 *sync_command_response;
-	atomic_t ca8210_is_awake;
+	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
 	int spi_errno;
 };
@@ -682,25 +682,23 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 {
 	struct ca8210_platform_data *pdata = spi->dev.platform_data;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
-	unsigned long startjiffies;
+	long status;
 
 	gpio_set_value(pdata->gpio_reset, 0);
-	atomic_set(&priv->ca8210_is_awake, 0);
+	reinit_completion(&priv->ca8210_is_awake);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, 1);
 
 	/* Wait until wakeup indication seen */
-	startjiffies = jiffies;
-	while (atomic_read(&priv->ca8210_is_awake) == 0) {
-		if (jiffies - startjiffies >
-		    msecs_to_jiffies(CA8210_SYNC_TIMEOUT)) {
-			dev_crit(
-				&spi->dev,
-				"Fatal: No wakeup from ca8210 after reset!\n"
-			);
-			break;
-		}
-		msleep(1);
+	status = wait_for_completion_interruptible_timeout(
+		&priv->ca8210_is_awake,
+		msecs_to_jiffies(CA8210_SYNC_TIMEOUT)
+	);
+	if (status == 0) {
+		dev_crit(
+			&spi->dev,
+			"Fatal: No wakeup from ca8210 after reset!\n"
+		);
 	}
 
 	dev_dbg(&spi->dev, "Reset the device\n");
@@ -862,9 +860,7 @@ static void ca8210_rx_done(struct ca8210_priv *priv)
 			dev_warn(&priv->spi->dev, "Wakeup reason unknown\n");
 			break;
 		}
-		spin_lock_irqsave(&priv->lock, flags);
-		atomic_inc(&priv->ca8210_is_awake);
-		spin_unlock_irqrestore(&priv->lock, flags);
+		complete(&priv->ca8210_is_awake);
 	}
 
 finish:;
@@ -3588,7 +3584,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->sync_up = 0;
 	priv->sync_down = 0;
 	mutex_init(&priv->sync_command_mutex);
-	atomic_set(&priv->ca8210_is_awake, 0);
+	init_completion(&priv->ca8210_is_awake);
 	spi_set_drvdata(priv->spi, priv);
 
 	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS))
