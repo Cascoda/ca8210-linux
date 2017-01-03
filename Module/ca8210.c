@@ -958,7 +958,10 @@ static int ca8210_spi_write(
 		return -ENODEV;
 	}
 
-	while (!mutex_trylock(&priv->cas_ctl.spi_mutex));
+	if (!mutex_trylock(&priv->cas_ctl.spi_mutex)) {
+		return -EBUSY;
+	}
+	reinit_completion(&priv->spi_transfer_complete);
 
 	/* Set in/out buffers to idle, copy over data to send */
 	memset(priv->cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -992,6 +995,7 @@ static int ca8210_spi_write(
 			"status %d from spi_sync in write\n",
 			status
 		);
+		mutex_unlock(&priv->cas_ctl.spi_mutex);
 	}
 
 	return status;
@@ -1040,6 +1044,8 @@ static int ca8210_spi_exchange(
 				"spi write failed, returned %d\n",
 				status
 			);
+			if (status == -EBUSY)
+				continue;
 			if (((buf[0] & SPI_SYN) && response))
 				mutex_unlock(&priv->sync_command_mutex);
 			goto cleanup;
