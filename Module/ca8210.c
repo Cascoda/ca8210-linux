@@ -880,7 +880,6 @@ static void ca8210_spi_write_complete(void *context)
 	struct ca8210_priv *priv = context;
 	bool duplex_rx = false;
 	int i;
-	unsigned long flags;
 	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
@@ -1816,7 +1815,6 @@ static int ca8210_async_xmit_complete(
 	u8                     status)
 {
 	struct ca8210_priv *priv = hw->priv;
-	unsigned long flags;
 
 	if (priv->nextmsduhandle != msduhandle) {
 		dev_err(
@@ -2191,7 +2189,6 @@ static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct ca8210_priv *priv = hw->priv;
 	int status;
-	unsigned long flags;
 
 	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_async()\n");
 
