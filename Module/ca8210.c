@@ -183,7 +183,7 @@
 #define MAX_BEACON_OVERHEAD        (75)
 #define MAX_BEACON_PAYLOAD_LENGTH  (IEEE802154_MTU - MAX_BEACON_OVERHEAD)
 
-#define MAX_ATTRIBUTE_SIZE              (250)
+#define MAX_ATTRIBUTE_SIZE              (122)
 #define MAX_DATA_SIZE                   (114)
 
 #define CA8210_VALID_CHANNELS                 (0x07FFF800)
