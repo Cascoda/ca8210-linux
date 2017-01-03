@@ -979,7 +979,7 @@ static int ca8210_spi_write(
 	priv->cas_ctl.tx_transfer.rx_buf = priv->cas_ctl.tx_in_buf;
 	priv->cas_ctl.tx_transfer.delay_usecs = 0;
 	priv->cas_ctl.tx_transfer.cs_change = 0;
-	priv->cas_ctl.tx_transfer.len = CA8210_SPI_BUF_SIZE;
+	priv->cas_ctl.tx_transfer.len = sizeof(struct mac_message);
 	priv->cas_ctl.tx_msg.complete = ca8210_spi_write_complete;
 	priv->cas_ctl.tx_msg.context = priv;
 
