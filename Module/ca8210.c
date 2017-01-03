@@ -320,6 +320,7 @@ struct cas_control {
 
 	struct mutex spi_mutex;
 	int spi_write_status;
+	struct completion rx_final_buf_clear;
 };
 
 /**
@@ -763,6 +764,7 @@ static void ca8210_rx_done(struct ca8210_priv *priv)
 
 	memcpy(buf, priv->cas_ctl.rx_final_buf, len);
 	memset(priv->cas_ctl.rx_final_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
+	complete(&priv->cas_ctl.rx_final_buf_clear);
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -908,21 +910,10 @@ static void ca8210_spi_write_complete(void *context)
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
 		for (i = 0; i < priv->cas_ctl.tx_in_buf[1] + 2; i++)
 			dev_dbg(&priv->spi->dev, "%#03x\n", priv->cas_ctl.tx_in_buf[i]);
-		do {
-			spin_lock_irqsave(&priv->lock, flags);
-			if (priv->cas_ctl.rx_final_buf[0] == SPI_IDLE) {
-				/* spi receive buffer cleared of last rx
-				 */
-				spin_unlock_irqrestore(
-					&priv->lock,
-					flags
-				);
-				break;
-			}
-			/* spi receive buffer still in use */
-			spin_unlock_irqrestore(&priv->lock, flags);
-			msleep(1);
-		} while (1);
+		wait_for_completion_interruptible(
+			&priv->cas_ctl.rx_final_buf_clear
+		);
+		reinit_completion(&priv->cas_ctl.rx_final_buf_clear);
 		memcpy(
 			priv->cas_ctl.rx_final_buf,
 			priv->cas_ctl.tx_in_buf,
@@ -3345,6 +3336,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
+	init_completion(&priv->cas_ctl.rx_final_buf_clear);
+	complete(&priv->cas_ctl.rx_final_buf_clear);
 	spi_set_drvdata(priv->spi, priv);
 
 	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS))
