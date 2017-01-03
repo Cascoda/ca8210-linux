@@ -1845,12 +1845,8 @@ static int ca8210_async_xmit_complete(
 		);
 	}
 
-	spin_lock_irqsave(&priv->lock, flags);
-
 	priv->async_tx_pending = false;
 	priv->nextmsduhandle++;
-
-	spin_unlock_irqrestore(&priv->lock, flags);
 
 	if (status) {
 		dev_err(
@@ -2209,15 +2205,13 @@ static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
 	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_async()\n");
 
 	priv->tx_skb = skb;
+	priv->async_tx_pending = true;
 	status = ca8210_skb_tx(skb, priv->nextmsduhandle, priv);
-	spin_lock_irqsave(&priv->lock, flags);
 	queue_delayed_work(
 		priv->async_tx_workqueue,
 		&priv->async_tx_timeout_work,
 		msecs_to_jiffies(CA8210_DATA_CNF_TIMEOUT)
 	);
-	priv->async_tx_pending = true;
-	spin_unlock_irqrestore(&priv->lock, flags);
 	return status;
 }
 
