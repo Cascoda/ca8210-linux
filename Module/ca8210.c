@@ -2065,56 +2065,6 @@ static int ca8210_skb_tx(
 }
 
 /**
- * ca8210_async_tx_worker() - Dispatched to handle asynchronous data
- *                            transmission
- * @work:  Work being executed
- */
-static void ca8210_async_tx_worker(struct work_struct *work)
-{
-	struct ca8210_priv *priv = container_of(
-		work,
-		struct ca8210_priv,
-		async_tx_work
-	);
-	unsigned long flags;
-	int ret;
-
-	if (!priv->tx_skb)
-		return;
-
-	ret = ca8210_skb_tx(priv->tx_skb, priv->nextmsduhandle, priv);
-	if (ret < 0) {
-		dev_warn(
-			&priv->spi->dev,
-			"Failed to transmit skb, returned %d\n",
-			ret
-		);
-		/* retry transmission higher up */
-		if (priv->spi_errno == -EAGAIN) {
-			dev_crit(
-				&priv->spi->dev,
-				"CA8210 CONSTANTLY NACKING!\n"
-			);
-			return;
-		}
-		ieee802154_wake_queue(priv->hw);
-		return;
-	}
-
-	queue_delayed_work(
-		priv->async_tx_workqueue,
-		&priv->async_tx_timeout_work,
-		msecs_to_jiffies(CA8210_DATA_CNF_TIMEOUT)
-	);
-
-	spin_lock_irqsave(&priv->lock, flags);
-
-	priv->async_tx_pending = true;
-
-	spin_unlock_irqrestore(&priv->lock, flags);
-}
-
-/**
  * ca8210_async_tx_timeout_worker() - Executed when an asynchronous transmission
  *                                    times out
  * @work:  Work being executed
@@ -2164,7 +2114,6 @@ static int ca8210_start(struct ieee802154_hw *hw)
 		dev_crit(&priv->spi->dev, "alloc_ordered_workqueue failed\n");
 		return -ENOMEM;
 	}
-	INIT_WORK(&priv->async_tx_work, ca8210_async_tx_worker);
 	INIT_DELAYED_WORK(
 		&priv->async_tx_timeout_work,
 		ca8210_async_tx_timeout_worker
