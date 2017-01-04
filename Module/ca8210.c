@@ -319,7 +319,7 @@ struct cas_control {
 	u8 *rx_final_buf;
 
 	struct mutex spi_mutex;
-	int spi_write_status;
+	int spi_transfer_status;
 	struct completion rx_final_buf_clear;
 };
 
@@ -674,7 +674,7 @@ static u8 mlme_reset_request_sync(
 	u8       set_default_pib,
 	void    *device_ref
 );
-static int ca8210_spi_write(
+static int ca8210_spi_transfer(
 	struct spi_device *spi,
 	const u8          *buf,
 	size_t             len
@@ -875,7 +875,7 @@ static void ca8210_rx_done(struct ca8210_priv *priv)
 finish:;
 }
 
-static void ca8210_spi_write_complete(void *context)
+static void ca8210_spi_transfer_complete(void *context)
 {
 	struct ca8210_priv *priv = context;
 	bool duplex_rx = false;
@@ -888,14 +888,14 @@ static void ca8210_spi_write_complete(void *context)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
-		priv->cas_ctl.spi_write_status = -EBUSY;
+		priv->cas_ctl.spi_transfer_status = -EBUSY;
 		memcpy(retry_buffer, priv->cas_ctl.tx_buf, CA8210_SPI_BUF_SIZE);
 		mutex_unlock(&priv->cas_ctl.spi_mutex);
-		ca8210_spi_write(priv->spi, retry_buffer, CA8210_SPI_BUF_SIZE);
+		ca8210_spi_transfer(priv->spi, retry_buffer, CA8210_SPI_BUF_SIZE);
 		dev_info(&priv->spi->dev, "retried spi write\n");
 		return;
 	} else {
-		priv->cas_ctl.spi_write_status = 0;
+		priv->cas_ctl.spi_transfer_status = 0;
 		if (
 			priv->cas_ctl.tx_in_buf[0] != SPI_IDLE &&
 			priv->cas_ctl.tx_in_buf[0] != SPI_NACK
@@ -924,14 +924,14 @@ static void ca8210_spi_write_complete(void *context)
 }
 
 /**
- * ca8210_spi_write() - Initiate duplex spi transfer with ca8210
+ * ca8210_spi_transfer() - Initiate duplex spi transfer with ca8210
  * @spi: Pointer to spi device for transfer
  * @buf: Octet array to send
  * @len: length of the buffer being sent
  *
  * Return: 0 or linux error code
  */
-static int ca8210_spi_write(
+static int ca8210_spi_transfer(
 	struct spi_device  *spi,
 	const u8           *buf,
 	size_t              len
@@ -943,7 +943,7 @@ static int ca8210_spi_write(
 	if (!spi) {
 		dev_crit(
 			&spi->dev,
-			"NULL spi device passed to ca8210_spi_write\n"
+			"NULL spi device passed to ca8210_spi_transfer\n"
 		);
 		return -ENODEV;
 	}
@@ -958,7 +958,7 @@ static int ca8210_spi_write(
 	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 	memcpy(priv->cas_ctl.tx_buf, buf, len);
 
-	dev_dbg(&spi->dev, "ca8210_spi_write called\n");
+	dev_dbg(&spi->dev, "ca8210_spi_transfer called\n");
 
 	for (i = 0; i < len; i++)
 		dev_dbg(&spi->dev, "%#03x\n", priv->cas_ctl.tx_buf[i]);
@@ -970,7 +970,7 @@ static int ca8210_spi_write(
 	priv->cas_ctl.tx_transfer.delay_usecs = 0;
 	priv->cas_ctl.tx_transfer.cs_change = 0;
 	priv->cas_ctl.tx_transfer.len = sizeof(struct mac_message);
-	priv->cas_ctl.tx_msg.complete = ca8210_spi_write_complete;
+	priv->cas_ctl.tx_msg.complete = ca8210_spi_transfer_complete;
 	priv->cas_ctl.tx_msg.context = priv;
 
 	spi_message_add_tail(
@@ -998,7 +998,7 @@ static int ca8210_spi_write(
  * @response:    buffer for storing synchronous response
  * @device_ref:  spi_device pointer for ca8210
  *
- * Effectively calls ca8210_spi_write to write buf[] to the spi, then for
+ * Effectively calls ca8210_spi_transfer to write buf[] to the spi, then for
  * synchronous commands waits for the corresponding response to be read from
  * the spi before returning. The response is written to the response parameter.
  *
@@ -1027,7 +1027,7 @@ static int ca8210_spi_exchange(
 
 	do {
 		reinit_completion(&priv->spi_transfer_complete);
-		status = ca8210_spi_write(priv->spi, buf, len);
+		status = ca8210_spi_transfer(priv->spi, buf, len);
 		if (status) {
 			dev_warn(
 				&spi->dev,
@@ -1042,7 +1042,7 @@ static int ca8210_spi_exchange(
 		}
 
 		wait_for_completion_interruptible(&priv->spi_transfer_complete);
-		status = priv->cas_ctl.spi_write_status;
+		status = priv->cas_ctl.spi_transfer_status;
 		if (status == -EBUSY) {
 			msleep(1);
 			write_retries++;
@@ -1109,7 +1109,7 @@ static void ca8210_irq_worker(struct work_struct *work)
 	int status;
 
 	do {
-		status = ca8210_spi_write(priv->spi, NULL, 0);
+		status = ca8210_spi_transfer(priv->spi, NULL, 0);
 		if (status && (status != -EBUSY)) {
 			dev_warn(
 				&priv->spi->dev,
@@ -1584,7 +1584,7 @@ static u8 mcps_data_request(
 		command.length += sizeof(struct secspec);
 	}
 
-	if (ca8210_spi_write(
+	if (ca8210_spi_transfer(
 		device_ref, &command.command_id, command.length + 2)
 	)
 		return MAC_SYSTEM_ERROR;
