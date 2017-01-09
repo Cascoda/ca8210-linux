@@ -294,14 +294,9 @@
 /**
  * struct cas_control - spi transfer structure
  * @tx_msg:               spi_message for each downstream exchange
- * @rx_msg:               spi_message for each upstream exchange
  * @tx_transfer:          spi_transfer for each downstream exchange
- * @rx_transfer:          spi_transfer for each upstream exchange
  * @tx_buf:               source array for transmission
  * @tx_in_buf:            array storing bytes received during transmission
- * @rx_buf:               destination array for reception
- * @rx_out_buf:           array storing bytes to present downstream during
- *                        reception
  * @rx_final_buf:         destination array for finished receive packet
  * @spi_mutex:            mutex protecting spi interface
  *
@@ -309,13 +304,11 @@
  * exchange for a single device.
  */
 struct cas_control {
-	struct spi_message tx_msg, rx_msg;
-	struct spi_transfer tx_transfer, rx_transfer;
+	struct spi_message tx_msg;
+	struct spi_transfer tx_transfer;
 
 	u8 *tx_buf;
 	u8 *tx_in_buf;
-	u8 *rx_buf;
-	u8 *rx_out_buf;
 	u8 *rx_final_buf;
 
 	struct mutex spi_mutex;
@@ -3045,26 +3038,6 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	}
 	memset(priv->cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 
-	priv->cas_ctl.rx_buf = kmalloc(
-		CA8210_SPI_BUF_SIZE,
-		GFP_DMA | GFP_KERNEL
-	);
-	if (!priv->cas_ctl.rx_buf) {
-		status = -EFAULT;
-		goto error;
-	}
-	memset(priv->cas_ctl.rx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
-
-	priv->cas_ctl.rx_out_buf = kmalloc(
-		CA8210_SPI_BUF_SIZE,
-		GFP_DMA | GFP_KERNEL
-	);
-	if (!priv->cas_ctl.rx_out_buf) {
-		status = -EFAULT;
-		goto error;
-	}
-	memset(priv->cas_ctl.rx_out_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
-
 	priv->cas_ctl.rx_final_buf = kmalloc(
 		CA8210_SPI_BUF_SIZE,
 		GFP_DMA | GFP_KERNEL
@@ -3079,10 +3052,6 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	priv->cas_ctl.tx_transfer.rx_nbits = 1; /* 1 MISO line */
 	priv->cas_ctl.tx_transfer.speed_hz = 0; /* Use device setting */
 	priv->cas_ctl.tx_transfer.bits_per_word = 0; /* Use device setting */
-	priv->cas_ctl.rx_transfer.tx_nbits = 1; /* 1 MOSI line */
-	priv->cas_ctl.rx_transfer.rx_nbits = 1; /* 1 MISO line */
-	priv->cas_ctl.rx_transfer.speed_hz = 0; /* Use device setting */
-	priv->cas_ctl.rx_transfer.bits_per_word = 0; /* Use device setting */
 
 	priv->mlme_workqueue = alloc_ordered_workqueue(
 		"MLME work queue",
@@ -3101,14 +3070,10 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	return 0;
 
 error:
-	kfree(priv->cas_ctl.rx_buf);
-	priv->cas_ctl.rx_buf = NULL;
 	kfree(priv->cas_ctl.tx_in_buf);
 	priv->cas_ctl.tx_in_buf = NULL;
 	kfree(priv->cas_ctl.tx_buf);
 	priv->cas_ctl.tx_buf = NULL;
-	kfree(priv->cas_ctl.rx_out_buf);
-	priv->cas_ctl.rx_out_buf = NULL;
 	kfree(priv->cas_ctl.rx_final_buf);
 	priv->cas_ctl.rx_final_buf = NULL;
 
@@ -3126,14 +3091,10 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 	flush_workqueue(priv->irq_workqueue);
 	destroy_workqueue(priv->irq_workqueue);
 
-	kfree(priv->cas_ctl.rx_buf);
-	priv->cas_ctl.rx_buf = NULL;
 	kfree(priv->cas_ctl.tx_in_buf);
 	priv->cas_ctl.tx_in_buf = NULL;
 	kfree(priv->cas_ctl.tx_buf);
 	priv->cas_ctl.tx_buf = NULL;
-	kfree(priv->cas_ctl.rx_out_buf);
-	priv->cas_ctl.rx_out_buf = NULL;
 	kfree(priv->cas_ctl.rx_final_buf);
 	priv->cas_ctl.rx_final_buf = NULL;
 }
