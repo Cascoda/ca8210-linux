@@ -309,7 +309,6 @@ struct cas_control {
 	u8 tx_buf[CA8210_SPI_BUF_SIZE];
 	u8 tx_in_buf[CA8210_SPI_BUF_SIZE];
 
-	int spi_transfer_status;
 	struct ca8210_priv *priv;
 };
 
@@ -341,7 +340,6 @@ struct ca8210_test {
  * @nextmsduhandle:         msdu handle to pass to the 15.4 MAC layer for the
  *                           next transmission
  * @clk:                    external clock provided by the ca8210
- * @cas_ctl:                spi control data section for this instance
  * @last_dsn:               sequence number of last data packet received, for
  *                           resend detection
  * @test:                   test interface data section for this instance
@@ -369,7 +367,6 @@ struct ca8210_priv {
 	struct sk_buff *tx_skb;
 	u8 nextmsduhandle;
 	struct clk *clk;
-	struct cas_control cas_ctl;
 	int last_dsn;
 	struct ca8210_test test;
 	bool async_tx_pending, sync_tx_pending;
@@ -864,20 +861,16 @@ static void ca8210_spi_transfer_complete(void *context)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
-		cas_ctl->spi_transfer_status = -EBUSY;
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		ca8210_spi_transfer(priv->spi, retry_buffer, CA8210_SPI_BUF_SIZE);
 		dev_info(&priv->spi->dev, "retried spi write\n");
 		return;
-	} else {
-		cas_ctl->spi_transfer_status = 0;
-		if (
+	} else if (
 			cas_ctl->tx_in_buf[0] != SPI_IDLE &&
 			cas_ctl->tx_in_buf[0] != SPI_NACK
 		) {
-			duplex_rx = true;
-		}
+		duplex_rx = true;
 	}
 
 	if (duplex_rx) {
@@ -986,7 +979,6 @@ static int ca8210_spi_exchange(
 	int status = 0;
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
-	int write_retries = 0;
 	long wait_remaining;
 
 	if ((buf[0] & SPI_SYN) && response) { /* if sync lock mutex */
@@ -1014,26 +1006,6 @@ static int ca8210_spi_exchange(
 		}
 
 		wait_for_completion_interruptible(&priv->spi_transfer_complete);
-		status = priv->cas_ctl.spi_transfer_status;
-		if (status == -EBUSY) {
-			msleep(1);
-			write_retries++;
-			if (write_retries > 20) {
-				dev_err(
-					&spi->dev,
-					"too many retries!\n"
-				);
-				if (((buf[0] & SPI_SYN) && response))
-					mutex_unlock(&priv->sync_command_mutex);
-				status = -EAGAIN;
-				goto cleanup;
-			}
-			dev_info(
-				&spi->dev,
-				"spi write retry %d...\n",
-				write_retries
-			);
-		}
 	} while (status < 0);
 
 	if (!((buf[0] & SPI_SYN) && response)) {
