@@ -2069,36 +2069,6 @@ static void ca8210_stop(struct ieee802154_hw *hw)
 }
 
 /**
- * ca8210_xmit_sync() - Synchronously transmits a given socket buffer using the
- *                      ca8210
- * @hw:   ieee802154_hw of ca8210 to transmit from
- * @skb:  Socket buffer to transmit
- *
- * Transmits the buffer and does not return until a confirmation of the exchange
- * is received from the ca8210.
- *
- * Return: 0 or linux error code
- */
-static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
-{
-	struct ca8210_priv *priv = hw->priv;
-	int status;
-
-	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_sync()\n");
-
-	status = ca8210_skb_tx(skb, priv->nextmsduhandle++, priv);
-	if (status)
-		return status;
-
-	priv->sync_tx_pending = true;
-
-	while (priv->sync_tx_pending)
-		msleep(1);
-
-	return 0;
-}
-
-/**
  * ca8210_xmit_async() - Asynchronously transmits a given socket buffer using
  *                       the ca8210
  * @hw:   ieee802154_hw of ca8210 to transmit from
@@ -2428,7 +2398,6 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 static const struct ieee802154_ops ca8210_phy_ops = {
 	.start = ca8210_start,
 	.stop = ca8210_stop,
-	.xmit_sync = ca8210_xmit_sync,
 	.xmit_async = ca8210_xmit_async,
 	.ed = ca8210_get_ed,
 	.set_channel = ca8210_set_channel,
