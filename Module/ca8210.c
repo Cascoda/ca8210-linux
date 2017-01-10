@@ -335,7 +335,6 @@ struct ca8210_test {
  * @async_tx_workqueue:     workqueue for asynchronous transmission
  * @mlme_workqueue:           workqueue for triggering MLME Reset
  * @irq_workqueue:          workqueue for irq processing
- * @async_tx_work:          work object for a single asynchronous transmission
  * @async_tx_timeout_work:  delayed work object for a single asynchronous
  *                           transmission timeout
  * @tx_skb:                 current socket buffer to transmit
@@ -366,7 +365,6 @@ struct ca8210_priv {
 	spinlock_t lock;
 	struct workqueue_struct *async_tx_workqueue, *mlme_workqueue;
 	struct workqueue_struct *irq_workqueue;
-	struct work_struct async_tx_work;
 	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
 	u8 nextmsduhandle;
