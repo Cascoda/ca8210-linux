@@ -869,7 +869,11 @@ static void ca8210_spi_transfer_complete(void *context)
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
-		ca8210_spi_transfer(priv->spi, retry_buffer, CA8210_SPI_BUF_SIZE);
+		ca8210_spi_transfer(
+			priv->spi,
+			retry_buffer,
+			CA8210_SPI_BUF_SIZE
+		);
 		dev_info(&priv->spi->dev, "retried spi write\n");
 		return;
 	} else if (
@@ -882,7 +886,11 @@ static void ca8210_spi_transfer_complete(void *context)
 	if (duplex_rx) {
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
 		for (i = 0; i < cas_ctl->tx_in_buf[1] + 2; i++)
-			dev_dbg(&priv->spi->dev, "%#03x\n", cas_ctl->tx_in_buf[i]);
+			dev_dbg(
+				&priv->spi->dev,
+				"%#03x\n",
+				cas_ctl->tx_in_buf[i]
+			);
 		ca8210_rx_done(cas_ctl);
 	}
 	complete(&priv->spi_transfer_complete);
@@ -994,7 +1002,6 @@ static int ca8210_spi_exchange(
 		}
 	}
 
-
 	do {
 		reinit_completion(&priv->spi_transfer_complete);
 		status = ca8210_spi_transfer(priv->spi, buf, len);
@@ -1014,9 +1021,8 @@ static int ca8210_spi_exchange(
 		wait_for_completion_interruptible(&priv->spi_transfer_complete);
 	} while (status < 0);
 
-	if (!((buf[0] & SPI_SYN) && response)) {
+	if (!((buf[0] & SPI_SYN) && response))
 		goto cleanup;
-	}
 
 	/* if sync wait for confirm */
 	priv->sync_command_response = response;
