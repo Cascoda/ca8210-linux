@@ -354,7 +354,6 @@ struct ca8210_test {
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  * @sync_down:              counts number of downstream synchronous commands
  * @sync_up:                counts number of upstream synchronous commands
- * @spi_errno:              error code of last spi transfer
  * @spi_transfer_complete   completion object for a single spi_transfer
  * @sync_exchange_complete  completion object for a complete synchronous API
  *                           exchange
@@ -378,7 +377,6 @@ struct ca8210_priv {
 	u8 *sync_command_response;
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
-	int spi_errno;
 	struct completion spi_transfer_complete, sync_exchange_complete;
 };
 
@@ -1041,7 +1039,6 @@ static int ca8210_spi_exchange(
 	priv->sync_command_response = NULL;
 
 cleanup:
-	priv->spi_errno = status;
 	return status;
 }
 
@@ -3166,7 +3163,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->async_tx_pending = false;
 	priv->sync_command_pending = false;
 	priv->hw_registered = false;
-	priv->spi_errno = 0;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
 	mutex_init(&priv->sync_command_mutex);
