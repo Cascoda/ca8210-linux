@@ -1,5 +1,5 @@
 # ca8210-linux
-Linux kernel drivers for Cascoda's CA-8210 IEEE 802.15.4 transceiver.
+Linux kernel driver for Cascoda's CA-8210 IEEE 802.15.4 transceiver.
 
 The master branch supports kernel 4.8. The backports branch can be built for kernel 4.1 onwards.
 
