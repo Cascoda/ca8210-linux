@@ -354,7 +354,10 @@ struct ca8210_test {
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  * @sync_down:              counts number of downstream synchronous commands
  * @sync_up:                counts number of upstream synchronous commands
- *
+ * @spi_errno:              error code of last spi transfer
+ * @spi_transfer_complete   completion object for a single spi_transfer
+ * @sync_exchange_complete  completion object for a complete synchronous API
+ *                           exchange
  */
 struct ca8210_priv {
 	struct spi_device *spi;
@@ -717,7 +720,7 @@ static void ca8210_mlme_reset_worker(struct work_struct *work)
 /**
  * ca8210_rx_done() - Calls various message dispatches responding to a received
  *                    command
- * @arg:  Pointer to the drivers private data structure
+ * @arg:  Pointer to the cas_control object for the relevant spi transfer
  *
  * Presents a received SAP command from the ca8210 to the Cascoda EVBME, test
  * interface and network driver.
@@ -847,6 +850,11 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 finish:;
 }
 
+/**
+ * ca8210_spi_transfer_complete() - Called when a single spi transfer has
+ *                                  completed
+ * @context:  Pointer to the cas_control object for the finished transfer
+ */
 static void ca8210_spi_transfer_complete(void *context)
 {
 	struct cas_control *cas_ctl = context;
@@ -1043,8 +1051,8 @@ cleanup:
  * @dev_id:  Pointer passed by the system, pointing to the ca8210's private data
  *
  * This function is called when the irq line from the ca8210 is asserted,
- * signifying that the ca8210 has a message to send upstream to us. Queues the
- * work of reading this message to be executed in non-atomic context.
+ * signifying that the ca8210 has a message to send upstream to us. Starts the
+ * asynchronous spi read.
  *
  * Return: irq return code
  */
@@ -2098,9 +2106,6 @@ static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
  *                       the ca8210
  * @hw:   ieee802154_hw of ca8210 to transmit from
  * @skb:  Socket buffer to transmit
- *
- * Hands the transmission of the buffer off to a workqueue and returns
- * immediately.
  *
  * Return: 0 or linux error code
  */
