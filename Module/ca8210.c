@@ -3145,9 +3145,12 @@ static int ca8210_probe(struct spi_device *spi_device)
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
 	spi_set_drvdata(priv->spi, priv);
-
-	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS))
+	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
+		cascoda_api_upstream = ca8210_test_int_driver_write;
 		ca8210_test_interface_init(priv);
+	} else {
+		cascoda_api_upstream = NULL;
+	}
 	ca8210_hw_setup(hw);
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
 
@@ -3244,28 +3247,7 @@ static struct spi_driver ca8210_spi_driver = {
 	.remove =                       ca8210_remove
 };
 
-static int __init ca8210_init(void)
-{
-	pr_info("Starting module ca8210\n");
-
-	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS))
-		cascoda_api_upstream = ca8210_test_int_driver_write;
-	else
-		cascoda_api_upstream = NULL;
-
-	spi_register_driver(&ca8210_spi_driver);
-	pr_info("ca8210 module started\n");
-	return 0;
-}
-module_init(ca8210_init);
-
-static void __exit ca8210_exit(void)
-{
-	pr_info("Stopping module ca8210\n");
-	spi_unregister_driver(&ca8210_spi_driver);
-	pr_info("ca8210 module stopped\n");
-}
-module_exit(ca8210_exit);
+module_spi_driver(ca8210_spi_driver);
 
 MODULE_AUTHOR("Harry Morris <h.morris@cascoda.com>");
 MODULE_DESCRIPTION("CA-8210 SoftMAC driver");
