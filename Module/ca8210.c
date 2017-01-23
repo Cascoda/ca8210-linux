@@ -1514,9 +1514,8 @@ static u8 mcps_data_request(
 		command.length += sizeof(struct secspec);
 	}
 
-	if (ca8210_spi_transfer(
-		device_ref, &command.command_id, command.length + 2)
-	)
+	if (ca8210_spi_transfer(device_ref, &command.command_id,
+				command.length + 2))
 		return MAC_SYSTEM_ERROR;
 
 	return MAC_SUCCESS;
