@@ -83,9 +83,6 @@
 #define CA8210_SPI_BUF_SIZE 256
 #define CA8210_SYNC_TIMEOUT 1000     /* Timeout for synchronous commands [ms] */
 
-/* api constants */
-#define CA8210_DATA_CNF_TIMEOUT 300   /* Timeout for data confirms [ms] */
-
 /* test interface constants */
 #define CA8210_TEST_INT_FILE_NAME "ca8210_test"
 #define CA8210_TEST_INT_FIFO_SIZE 256
@@ -331,11 +328,8 @@ struct ca8210_test {
  * @hw:                     pointer to the ca8210 ieee802154_hw object
  * @hw_registered:          true if hw has been registered with ieee802154
  * @lock:                   spinlock protecting the private data area
- * @async_tx_workqueue:     workqueue for asynchronous transmission
  * @mlme_workqueue:           workqueue for triggering MLME Reset
  * @irq_workqueue:          workqueue for irq processing
- * @async_tx_timeout_work:  delayed work object for a single asynchronous
- *                           transmission timeout
  * @tx_skb:                 current socket buffer to transmit
  * @nextmsduhandle:         msdu handle to pass to the 15.4 MAC layer for the
  *                           next transmission
@@ -363,9 +357,8 @@ struct ca8210_priv {
 	struct ieee802154_hw *hw;
 	bool hw_registered;
 	spinlock_t lock;
-	struct workqueue_struct *async_tx_workqueue, *mlme_workqueue;
+	struct workqueue_struct *mlme_workqueue;
 	struct workqueue_struct *irq_workqueue;
-	struct delayed_work async_tx_timeout_work;
 	struct sk_buff *tx_skb;
 	u8 nextmsduhandle;
 	struct clk *clk;
@@ -1755,14 +1748,6 @@ static int ca8210_async_xmit_complete(
 		return -EIO;
 	}
 
-	/* stop timeout work */
-	if (!cancel_delayed_work_sync(&priv->async_tx_timeout_work)) {
-		dev_err(
-			&priv->spi->dev,
-			"async tx timeout wasn't pending when transfer complete\n"
-		);
-	}
-
 	priv->async_tx_pending = false;
 	priv->nextmsduhandle++;
 
@@ -1983,36 +1968,6 @@ static int ca8210_skb_tx(
 }
 
 /**
- * ca8210_async_tx_timeout_worker() - Executed when an asynchronous transmission
- *                                    times out
- * @work:  Work being executed
- */
-static void ca8210_async_tx_timeout_worker(struct work_struct *work)
-{
-	struct delayed_work *del_work = container_of(
-		work,
-		struct delayed_work,
-		work
-	);
-	struct ca8210_priv *priv = container_of(
-		del_work,
-		struct ca8210_priv,
-		async_tx_timeout_work
-	);
-	unsigned long flags;
-
-	dev_err(&priv->spi->dev, "data confirm timed out\n");
-
-	spin_lock_irqsave(&priv->lock, flags);
-
-	priv->async_tx_pending = false;
-
-	spin_unlock_irqrestore(&priv->lock, flags);
-
-	ieee802154_wake_queue(priv->hw);
-}
-
-/**
  * ca8210_start() - Starts the network driver
  * @hw:  ieee802154_hw of ca8210 being started
  *
@@ -2023,19 +1978,6 @@ static int ca8210_start(struct ieee802154_hw *hw)
 	int status;
 	u8 rx_on_when_idle;
 	struct ca8210_priv *priv = hw->priv;
-
-	priv->async_tx_workqueue = alloc_ordered_workqueue(
-		"ca8210 tx worker",
-		0
-	);
-	if (!priv->async_tx_workqueue) {
-		dev_crit(&priv->spi->dev, "alloc_ordered_workqueue failed\n");
-		return -ENOMEM;
-	}
-	INIT_DELAYED_WORK(
-		&priv->async_tx_timeout_work,
-		ca8210_async_tx_timeout_worker
-	);
 
 	priv->last_dsn = -1;
 	/* Turn receiver on when idle for now just to test rx */
@@ -2067,10 +2009,6 @@ static int ca8210_start(struct ieee802154_hw *hw)
  */
 static void ca8210_stop(struct ieee802154_hw *hw)
 {
-	struct ca8210_priv *priv = hw->priv;
-
-	flush_workqueue(priv->async_tx_workqueue);
-	destroy_workqueue(priv->async_tx_workqueue);
 }
 
 /**
@@ -2091,11 +2029,6 @@ static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
 	priv->tx_skb = skb;
 	priv->async_tx_pending = true;
 	status = ca8210_skb_tx(skb, priv->nextmsduhandle, priv);
-	queue_delayed_work(
-		priv->async_tx_workqueue,
-		&priv->async_tx_timeout_work,
-		msecs_to_jiffies(CA8210_DATA_CNF_TIMEOUT)
-	);
 	return status;
 }
 
