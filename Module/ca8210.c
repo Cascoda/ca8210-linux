@@ -339,8 +339,6 @@ struct ca8210_test {
  * @test:                   test interface data section for this instance
  * @async_tx_pending:       true if an asynchronous transmission was started and
  *                           is not complete
- * @sync_tx_pending:        true if a synchronous (from driver perspective)
- *                           transmission was started and is not complete
  * @sync_command_response:  pointer to buffer to fill with sync response
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  * @sync_down:              counts number of downstream synchronous commands
@@ -361,7 +359,7 @@ struct ca8210_priv {
 	struct clk *clk;
 	int last_dsn;
 	struct ca8210_test test;
-	bool async_tx_pending, sync_tx_pending;
+	bool async_tx_pending;
 	u8 *sync_command_response;
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
@@ -1883,8 +1881,6 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, u8 *command, size_t len)
 				command[2],
 				status
 			);
-		} else if (priv->sync_tx_pending) {
-			priv->sync_tx_pending = false;
 		}
 	}
 
