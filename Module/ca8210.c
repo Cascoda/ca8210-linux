@@ -340,11 +340,6 @@ struct ca8210_test {
  * @test:                   test interface data section for this instance
  * @async_tx_pending:       true if an asynchronous transmission was started and
  *                           is not complete
- * @sync_tx_pending:        true if a synchronous (from driver perspective)
- *                           transmission was started and is not complete
- * @sync_command_pending:   true if waiting for a synchronous (Cascoda API)
- *                           response
- * @sync_command_mutex:     mutex controlling access to sync command objects
  * @sync_command_response:  pointer to buffer to fill with sync response
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  * @sync_down:              counts number of downstream synchronous commands
@@ -365,9 +360,7 @@ struct ca8210_priv {
 	struct clk *clk;
 	int last_dsn;
 	struct ca8210_test test;
-	bool async_tx_pending, sync_tx_pending;
-	bool sync_command_pending;
-	struct mutex sync_command_mutex;
+	bool async_tx_pending;
 	u8 *sync_command_response;
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
@@ -736,24 +729,10 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 	}
 
 	if (buf[0] & SPI_SYN) {
-		if (mutex_lock_interruptible(&priv->sync_command_mutex))
-			goto finish;
-		if (priv->sync_command_pending) {
-			if (!priv->sync_command_response) {
-				priv->sync_command_pending = false;
-				mutex_unlock(&priv->sync_command_mutex);
-				dev_crit(
-					&priv->spi->dev,
-					"Sync command provided no response buffer\n"
-				);
-				goto finish;
-			}
+		if (priv->sync_command_response) {
 			memcpy(priv->sync_command_response, buf, len);
-			priv->sync_command_pending = false;
 			complete(&priv->sync_exchange_complete);
-			mutex_unlock(&priv->sync_command_mutex);
 		} else {
-			mutex_unlock(&priv->sync_command_mutex);
 			if (cascoda_api_upstream)
 				cascoda_api_upstream(buf, len, priv->spi);
 			priv->sync_up++;
@@ -989,11 +968,9 @@ static int ca8210_spi_exchange(
 	struct ca8210_priv *priv = spi->dev.driver_data;
 	long wait_remaining;
 
-	if ((buf[0] & SPI_SYN) && response) { /* if sync lock mutex */
-		if (mutex_lock_interruptible(&priv->sync_command_mutex)) {
-			status = -ERESTARTSYS;
-			goto cleanup;
-		}
+	if ((buf[0] & SPI_SYN) && response) { /* if sync wait for confirm */
+		reinit_completion(&priv->sync_exchange_complete);
+		priv->sync_command_response = response;
 	}
 
 	do {
@@ -1008,7 +985,7 @@ static int ca8210_spi_exchange(
 			if (status == -EBUSY)
 				continue;
 			if (((buf[0] & SPI_SYN) && response))
-				mutex_unlock(&priv->sync_command_mutex);
+				complete(&priv->sync_exchange_complete);
 			goto cleanup;
 		}
 
@@ -1018,11 +995,6 @@ static int ca8210_spi_exchange(
 	if (!((buf[0] & SPI_SYN) && response))
 		goto cleanup;
 
-	/* if sync wait for confirm */
-	priv->sync_command_response = response;
-	priv->sync_command_pending = true;
-	reinit_completion(&priv->sync_exchange_complete);
-	mutex_unlock(&priv->sync_command_mutex);
 	wait_remaining = wait_for_completion_interruptible_timeout(
 		&priv->sync_exchange_complete,
 		msecs_to_jiffies(CA8210_SYNC_TIMEOUT)
@@ -1910,8 +1882,6 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, u8 *command, size_t len)
 				command[2],
 				status
 			);
-		} else if (priv->sync_tx_pending) {
-			priv->sync_tx_pending = false;
 		}
 	}
 
@@ -3097,11 +3067,9 @@ static int ca8210_probe(struct spi_device *spi_device)
 	hw->parent = &spi_device->dev;
 	spin_lock_init(&priv->lock);
 	priv->async_tx_pending = false;
-	priv->sync_command_pending = false;
 	priv->hw_registered = false;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
-	mutex_init(&priv->sync_command_mutex);
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
