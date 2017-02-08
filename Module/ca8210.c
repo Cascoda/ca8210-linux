@@ -2294,7 +2294,7 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	if (status) {
 		dev_err(
 			&priv->spi->dev,
-			"error setting panid, MLME-SET.confirm status = %d",
+			"error setting frame retries, MLME-SET.confirm status = %d",
 			status
 		);
 	}
