@@ -1761,6 +1761,7 @@ static int ca8210_skb_rx(
 	struct ieee802154_hdr hdr;
 	int msdulen;
 	int hlen;
+	u8 mpdulinkquality = data_ind[23];
 	struct sk_buff *skb;
 	struct ca8210_priv *priv = hw->priv;
 
@@ -1831,7 +1832,7 @@ static int ca8210_skb_rx(
 	/* Copy msdu to skb */
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
 
-	ieee802154_rx_irqsafe(hw, skb, data_ind[23]/*LQI*/);
+	ieee802154_rx_irqsafe(hw, skb, mpdulinkquality/*LQI*/);
 	return 0;
 }
 
