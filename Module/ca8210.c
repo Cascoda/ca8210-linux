@@ -1832,8 +1832,6 @@ static int ca8210_skb_rx(
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
 
 	ieee802154_rx_irqsafe(hw, skb, data_ind[23]/*LQI*/);
-	/* TODO: Set protocol & checksum? */
-	/* TODO: update statistics */
 	return 0;
 }
 
