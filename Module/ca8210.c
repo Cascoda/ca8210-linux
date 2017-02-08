@@ -1773,7 +1773,12 @@ static int ca8210_skb_rx(
 	}
 	skb_reserve(skb, sizeof(hdr));
 
-	msdulen = data_ind[22]; /* msdu_length */
+	/* Effectively check if promiscuous packet */
+	if (mpdulinkquality == 0) {
+		msdulen = len - 29;
+	} else {
+		msdulen = data_ind[22]; /* msdu_length */
+	}
 	if (msdulen > IEEE802154_MTU) {
 		dev_err(
 			&priv->spi->dev,
@@ -1783,6 +1788,9 @@ static int ca8210_skb_rx(
 		return -EMSGSIZE;
 	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
+
+	if (mpdulinkquality == 0)
+		goto copy_payload;
 
 	/* Populate hdr */
 	hdr.sec.level = data_ind[29 + msdulen];
@@ -1828,6 +1836,7 @@ static int ca8210_skb_rx(
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
 
+copy_payload:
 	/* Add <msdulen> bytes of space to the back of the buffer */
 	/* Copy msdu to skb */
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
@@ -2302,6 +2311,28 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	return link_to_linux_err(status);
 }
 
+static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
+{
+	u8 status;
+	struct ca8210_priv *priv = hw->priv;
+
+	status = mlme_set_request_sync(
+		MAC_PROMISCUOUS_MODE,
+		0,
+		1,
+		(const void*)&on,
+		priv->spi
+	);
+	if (status) {
+		dev_err(
+			&priv->spi->dev,
+			"error setting promiscuous mode, MLME-SET.confirm status = %d",
+			status
+		);
+	}
+	return link_to_linux_err(status);
+}
+
 static const struct ieee802154_ops ca8210_phy_ops = {
 	.start = ca8210_start,
 	.stop = ca8210_stop,
@@ -2313,7 +2344,8 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_cca_mode = ca8210_set_cca_mode,
 	.set_cca_ed_level = ca8210_set_cca_ed_level,
 	.set_csma_params = ca8210_set_csma_params,
-	.set_frame_retries = ca8210_set_frame_retries
+	.set_frame_retries = ca8210_set_frame_retries,
+	.set_promiscuous_mode = ca8210_set_promiscuous_mode
 };
 
 /* Test/EVBME Interface */
@@ -2889,6 +2921,7 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 		IEEE802154_HW_AFILT |
 		IEEE802154_HW_OMIT_CKSUM |
 		IEEE802154_HW_FRAME_RETRIES |
+		IEEE802154_HW_PROMISCUOUS |
 		IEEE802154_HW_CSMA_PARAMS;
 	ca8210_hw->phy->flags =
 		WPAN_PHY_FLAG_TXPOWER |
