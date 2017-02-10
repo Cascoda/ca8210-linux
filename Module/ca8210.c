@@ -364,6 +364,7 @@ struct ca8210_priv {
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
 	struct completion spi_transfer_complete, sync_exchange_complete;
+	bool promiscuous;
 };
 
 /**
@@ -667,6 +668,7 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 	reinit_completion(&priv->ca8210_is_awake);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, 1);
+	priv->promiscuous = false;
 
 	/* Wait until wakeup indication seen */
 	status = wait_for_completion_interruptible_timeout(
@@ -1773,12 +1775,7 @@ static int ca8210_skb_rx(
 	}
 	skb_reserve(skb, sizeof(hdr));
 
-	/* Effectively check if promiscuous packet */
-	if (mpdulinkquality == 0) {
-		msdulen = len - 29;
-	} else {
-		msdulen = data_ind[22]; /* msdu_length */
-	}
+	msdulen = data_ind[22]; /* msdu_length */
 	if (msdulen > IEEE802154_MTU) {
 		dev_err(
 			&priv->spi->dev,
@@ -1789,7 +1786,7 @@ static int ca8210_skb_rx(
 	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
 
-	if (mpdulinkquality == 0)
+	if (priv->promiscuous)
 		goto copy_payload;
 
 	/* Populate hdr */
@@ -1841,7 +1838,7 @@ copy_payload:
 	/* Copy msdu to skb */
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
 
-	ieee802154_rx_irqsafe(hw, skb, mpdulinkquality/*LQI*/);
+	ieee802154_rx_irqsafe(hw, skb, mpdulinkquality);
 	return 0;
 }
 
@@ -2329,6 +2326,8 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 			"error setting promiscuous mode, MLME-SET.confirm status = %d",
 			status
 		);
+	} else {
+		priv->promiscuous = on;
 	}
 	return link_to_linux_err(status);
 }
@@ -3073,6 +3072,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
+	priv->promiscuous = false;
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
