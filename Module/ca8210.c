@@ -365,6 +365,7 @@ struct ca8210_priv {
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
 	struct completion spi_transfer_complete, sync_exchange_complete;
+	bool promiscuous;
 };
 
 /**
@@ -668,6 +669,7 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 	reinit_completion(&priv->ca8210_is_awake);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, 1);
+	priv->promiscuous = false;
 
 	/* Wait until wakeup indication seen */
 	status = wait_for_completion_interruptible_timeout(
@@ -1762,6 +1764,7 @@ static int ca8210_skb_rx(
 	struct ieee802154_hdr hdr;
 	int msdulen;
 	int hlen;
+	u8 mpdulinkquality = data_ind[23];
 	struct sk_buff *skb;
 	struct ca8210_priv *priv = hw->priv;
 
@@ -1783,6 +1786,9 @@ static int ca8210_skb_rx(
 		return -EMSGSIZE;
 	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
+
+	if (priv->promiscuous)
+		goto copy_payload;
 
 	/* Populate hdr */
 	hdr.sec.level = data_ind[29 + msdulen];
@@ -1828,11 +1834,12 @@ static int ca8210_skb_rx(
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
 
+copy_payload:
 	/* Add <msdulen> bytes of space to the back of the buffer */
 	/* Copy msdu to skb */
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
 
-	ieee802154_rx_irqsafe(hw, skb, data_ind[23]/*LQI*/);
+	ieee802154_rx_irqsafe(hw, skb, mpdulinkquality);
 	return 0;
 }
 
@@ -2310,9 +2317,33 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	if (status) {
 		dev_err(
 			&priv->spi->dev,
-			"error setting panid, MLME-SET.confirm status = %d",
+			"error setting frame retries, MLME-SET.confirm status = %d",
 			status
 		);
+	}
+	return link_to_linux_err(status);
+}
+
+static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
+{
+	u8 status;
+	struct ca8210_priv *priv = hw->priv;
+
+	status = mlme_set_request_sync(
+		MAC_PROMISCUOUS_MODE,
+		0,
+		1,
+		(const void*)&on,
+		priv->spi
+	);
+	if (status) {
+		dev_err(
+			&priv->spi->dev,
+			"error setting promiscuous mode, MLME-SET.confirm status = %d",
+			status
+		);
+	} else {
+		priv->promiscuous = on;
 	}
 	return link_to_linux_err(status);
 }
@@ -2328,7 +2359,8 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_cca_mode = ca8210_set_cca_mode,
 	.set_cca_ed_level = ca8210_set_cca_ed_level,
 	.set_csma_params = ca8210_set_csma_params,
-	.set_frame_retries = ca8210_set_frame_retries
+	.set_frame_retries = ca8210_set_frame_retries,
+	.set_promiscuous_mode = ca8210_set_promiscuous_mode
 };
 
 /* Test/EVBME Interface */
@@ -2908,6 +2940,7 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 		IEEE802154_HW_AFILT |
 		IEEE802154_HW_OMIT_CKSUM |
 		IEEE802154_HW_FRAME_RETRIES |
+		IEEE802154_HW_PROMISCUOUS |
 		IEEE802154_HW_CSMA_PARAMS;
 	ca8210_hw->phy->flags =
 		WPAN_PHY_FLAG_TXPOWER |
@@ -3068,6 +3101,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
+	priv->promiscuous = false;
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
