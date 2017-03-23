@@ -848,6 +848,14 @@ static void ca8210_spi_transfer_complete(void *context)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
+		if (cas_ctl->tx_buf[0] == SPI_IDLE) {
+			dev_warn(
+				&priv->spi->dev,
+				"IRQ servicing NACKd, dropping transfer\n"
+			);
+			kfree(cas_ctl);
+			return;
+		}
 		if (priv->retries > 3) {
 			dev_err(&priv->spi->dev, "too many retries!\n");
 			kfree(cas_ctl);
