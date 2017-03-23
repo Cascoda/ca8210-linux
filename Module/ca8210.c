@@ -346,6 +346,7 @@ struct ca8210_test {
  * @spi_transfer_complete   completion object for a single spi_transfer
  * @sync_exchange_complete  completion object for a complete synchronous API
  *                           exchange
+ * @promiscuous             whether the ca8210 is in promiscuous mode or not
  * @retries:                records how many times the current pending spi
  *                           transfer has been retried
  */
