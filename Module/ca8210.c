@@ -1013,7 +1013,20 @@ static int ca8210_spi_exchange(
 			goto cleanup;
 		}
 
-		wait_for_completion_interruptible(&priv->spi_transfer_complete);
+		wait_remaining = wait_for_completion_interruptible_timeout(
+			&priv->spi_transfer_complete,
+			msecs_to_jiffies(1000)
+		);
+		if (wait_remaining == -ERESTARTSYS) {
+			status = -ERESTARTSYS;
+		} else if (wait_remaining == 0) {
+			dev_err(
+				&spi->dev,
+				"SPI downstream transfer timed out!\n"
+			);
+			status = -ETIME;
+			goto cleanup;
+		}
 	} while (status < 0);
 
 	if (!((buf[0] & SPI_SYN) && response))
@@ -1032,9 +1045,9 @@ static int ca8210_spi_exchange(
 		);
 		status = -ETIME;
 	}
-	priv->sync_command_response = NULL;
 
 cleanup:
+	priv->sync_command_response = NULL;
 	return status;
 }
 
