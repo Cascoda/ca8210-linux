@@ -347,6 +347,9 @@ struct ca8210_test {
  * @spi_transfer_complete   completion object for a single spi_transfer
  * @sync_exchange_complete  completion object for a complete synchronous API
  *                           exchange
+ * @promiscuous             whether the ca8210 is in promiscuous mode or not
+ * @retries:                records how many times the current pending spi
+ *                           transfer has been retried
  */
 struct ca8210_priv {
 	struct spi_device *spi;
@@ -366,6 +369,7 @@ struct ca8210_priv {
 	int sync_down, sync_up;
 	struct completion spi_transfer_complete, sync_exchange_complete;
 	bool promiscuous;
+	int retries;
 };
 
 /**
@@ -823,6 +827,8 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 finish:;
 }
 
+static int ca8210_remove(struct spi_device *spi_device);
+
 /**
  * ca8210_spi_transfer_complete() - Called when a single spi transfer has
  *                                  completed
@@ -837,11 +843,26 @@ static void ca8210_spi_transfer_complete(void *context)
 	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
-		cas_ctl->tx_in_buf[0] == SPI_NACK &&
-		cas_ctl->tx_in_buf[1] == SPI_NACK
+		cas_ctl->tx_in_buf[0] == SPI_NACK ||
+		(cas_ctl->tx_in_buf[0] == SPI_IDLE &&
+		cas_ctl->tx_in_buf[1] == SPI_NACK)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
+		if (cas_ctl->tx_buf[0] == SPI_IDLE) {
+			dev_warn(
+				&priv->spi->dev,
+				"IRQ servicing NACKd, dropping transfer\n"
+			);
+			kfree(cas_ctl);
+			return;
+		}
+		if (priv->retries > 3) {
+			dev_err(&priv->spi->dev, "too many retries!\n");
+			kfree(cas_ctl);
+			ca8210_remove(priv->spi);
+			return;
+		}
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		ca8210_spi_transfer(
@@ -849,6 +870,7 @@ static void ca8210_spi_transfer_complete(void *context)
 			retry_buffer,
 			CA8210_SPI_BUF_SIZE
 		);
+		priv->retries++;
 		dev_info(&priv->spi->dev, "retried spi write\n");
 		return;
 	} else if (
@@ -870,6 +892,7 @@ static void ca8210_spi_transfer_complete(void *context)
 	}
 	complete(&priv->spi_transfer_complete);
 	kfree(cas_ctl);
+	priv->retries = 0;
 }
 
 /**
@@ -991,7 +1014,20 @@ static int ca8210_spi_exchange(
 			goto cleanup;
 		}
 
-		wait_for_completion_interruptible(&priv->spi_transfer_complete);
+		wait_remaining = wait_for_completion_interruptible_timeout(
+			&priv->spi_transfer_complete,
+			msecs_to_jiffies(1000)
+		);
+		if (wait_remaining == -ERESTARTSYS) {
+			status = -ERESTARTSYS;
+		} else if (wait_remaining == 0) {
+			dev_err(
+				&spi->dev,
+				"SPI downstream transfer timed out!\n"
+			);
+			status = -ETIME;
+			goto cleanup;
+		}
 	} while (status < 0);
 
 	if (!((buf[0] & SPI_SYN) && response))
@@ -1010,9 +1046,9 @@ static int ca8210_spi_exchange(
 		);
 		status = -ETIME;
 	}
-	priv->sync_command_response = NULL;
 
 cleanup:
+	priv->sync_command_response = NULL;
 	return status;
 }
 
@@ -3102,6 +3138,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->sync_up = 0;
 	priv->sync_down = 0;
 	priv->promiscuous = false;
+	priv->retries = 0;
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
