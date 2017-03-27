@@ -133,6 +133,7 @@
 #define HWME_EDTHRESHOLD       (0x04)
 #define HWME_EDVALUE           (0x06)
 #define HWME_SYSCLKOUT         (0x0F)
+#define HWME_LQILIMIT          (0x11)
 
 /* TDME attribute IDs */
 #define TDME_CHANNEL          (0x00)
@@ -1988,6 +1989,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 {
 	int status;
 	u8 rx_on_when_idle;
+	u8 lqi_threshold = 0;
 	struct ca8210_priv *priv = hw->priv;
 
 	priv->last_dsn = -1;
@@ -2004,6 +2006,20 @@ static int ca8210_start(struct ieee802154_hw *hw)
 		dev_crit(
 			&priv->spi->dev,
 			"Setting rx_on_when_idle failed, status = %d\n",
+			status
+		);
+		return link_to_linux_err(status);
+	}
+	status = hwme_set_request_sync(
+		HWME_LQILIMIT,
+		1,
+		&lqi_threshold,
+		priv->spi
+	);
+	if (status) {
+		dev_crit(
+			&priv->spi->dev,
+			"Setting lqilimit failed, status = %d\n",
 			status
 		);
 		return link_to_linux_err(status);
