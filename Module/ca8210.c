@@ -134,6 +134,7 @@
 #define HWME_EDTHRESHOLD       (0x04)
 #define HWME_EDVALUE           (0x06)
 #define HWME_SYSCLKOUT         (0x0F)
+#define HWME_LQILIMIT          (0x11)
 
 /* TDME attribute IDs */
 #define TDME_CHANNEL          (0x00)
@@ -347,6 +348,9 @@ struct ca8210_test {
  * @spi_transfer_complete   completion object for a single spi_transfer
  * @sync_exchange_complete  completion object for a complete synchronous API
  *                           exchange
+ * @promiscuous             whether the ca8210 is in promiscuous mode or not
+ * @retries:                records how many times the current pending spi
+ *                           transfer has been retried
  */
 struct ca8210_priv {
 	struct spi_device *spi;
@@ -365,6 +369,8 @@ struct ca8210_priv {
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
 	struct completion spi_transfer_complete, sync_exchange_complete;
+	bool promiscuous;
+	int retries;
 };
 
 /**
@@ -668,6 +674,7 @@ static void ca8210_reset_send(struct spi_device *spi, unsigned int ms)
 	reinit_completion(&priv->ca8210_is_awake);
 	msleep(ms);
 	gpio_set_value(pdata->gpio_reset, 1);
+	priv->promiscuous = false;
 
 	/* Wait until wakeup indication seen */
 	status = wait_for_completion_interruptible_timeout(
@@ -821,6 +828,8 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 finish:;
 }
 
+static int ca8210_remove(struct spi_device *spi_device);
+
 /**
  * ca8210_spi_transfer_complete() - Called when a single spi transfer has
  *                                  completed
@@ -835,11 +844,26 @@ static void ca8210_spi_transfer_complete(void *context)
 	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
-		cas_ctl->tx_in_buf[0] == SPI_NACK &&
-		cas_ctl->tx_in_buf[1] == SPI_NACK
+		cas_ctl->tx_in_buf[0] == SPI_NACK ||
+		(cas_ctl->tx_in_buf[0] == SPI_IDLE &&
+		cas_ctl->tx_in_buf[1] == SPI_NACK)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
+		if (cas_ctl->tx_buf[0] == SPI_IDLE) {
+			dev_warn(
+				&priv->spi->dev,
+				"IRQ servicing NACKd, dropping transfer\n"
+			);
+			kfree(cas_ctl);
+			return;
+		}
+		if (priv->retries > 3) {
+			dev_err(&priv->spi->dev, "too many retries!\n");
+			kfree(cas_ctl);
+			ca8210_remove(priv->spi);
+			return;
+		}
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		ca8210_spi_transfer(
@@ -847,6 +871,7 @@ static void ca8210_spi_transfer_complete(void *context)
 			retry_buffer,
 			CA8210_SPI_BUF_SIZE
 		);
+		priv->retries++;
 		dev_info(&priv->spi->dev, "retried spi write\n");
 		return;
 	} else if (
@@ -868,6 +893,7 @@ static void ca8210_spi_transfer_complete(void *context)
 	}
 	complete(&priv->spi_transfer_complete);
 	kfree(cas_ctl);
+	priv->retries = 0;
 }
 
 /**
@@ -989,7 +1015,20 @@ static int ca8210_spi_exchange(
 			goto cleanup;
 		}
 
-		wait_for_completion_interruptible(&priv->spi_transfer_complete);
+		wait_remaining = wait_for_completion_interruptible_timeout(
+			&priv->spi_transfer_complete,
+			msecs_to_jiffies(1000)
+		);
+		if (wait_remaining == -ERESTARTSYS) {
+			status = -ERESTARTSYS;
+		} else if (wait_remaining == 0) {
+			dev_err(
+				&spi->dev,
+				"SPI downstream transfer timed out!\n"
+			);
+			status = -ETIME;
+			goto cleanup;
+		}
 	} while (status < 0);
 
 	if (!((buf[0] & SPI_SYN) && response))
@@ -1008,9 +1047,9 @@ static int ca8210_spi_exchange(
 		);
 		status = -ETIME;
 	}
-	priv->sync_command_response = NULL;
 
 cleanup:
+	priv->sync_command_response = NULL;
 	return status;
 }
 
@@ -1762,6 +1801,7 @@ static int ca8210_skb_rx(
 	struct ieee802154_hdr hdr;
 	int msdulen;
 	int hlen;
+	u8 mpdulinkquality = data_ind[23];
 	struct sk_buff *skb;
 	struct ca8210_priv *priv = hw->priv;
 
@@ -1783,6 +1823,9 @@ static int ca8210_skb_rx(
 		return -EMSGSIZE;
 	}
 	dev_dbg(&priv->spi->dev, "skb buffer length = %d\n", msdulen);
+
+	if (priv->promiscuous)
+		goto copy_payload;
 
 	/* Populate hdr */
 	hdr.sec.level = data_ind[29 + msdulen];
@@ -1828,11 +1871,12 @@ static int ca8210_skb_rx(
 	skb_reset_mac_header(skb);
 	skb->mac_len = hlen;
 
+copy_payload:
 	/* Add <msdulen> bytes of space to the back of the buffer */
 	/* Copy msdu to skb */
 	memcpy(skb_put(skb, msdulen), &data_ind[29], msdulen);
 
-	ieee802154_rx_irqsafe(hw, skb, data_ind[23]/*LQI*/);
+	ieee802154_rx_irqsafe(hw, skb, mpdulinkquality);
 	return 0;
 }
 
@@ -1946,6 +1990,7 @@ static int ca8210_start(struct ieee802154_hw *hw)
 {
 	int status;
 	u8 rx_on_when_idle;
+	u8 lqi_threshold = 0;
 	struct ca8210_priv *priv = hw->priv;
 
 	priv->last_dsn = -1;
@@ -1962,6 +2007,20 @@ static int ca8210_start(struct ieee802154_hw *hw)
 		dev_crit(
 			&priv->spi->dev,
 			"Setting rx_on_when_idle failed, status = %d\n",
+			status
+		);
+		return link_to_linux_err(status);
+	}
+	status = hwme_set_request_sync(
+		HWME_LQILIMIT,
+		1,
+		&lqi_threshold,
+		priv->spi
+	);
+	if (status) {
+		dev_crit(
+			&priv->spi->dev,
+			"Setting lqilimit failed, status = %d\n",
 			status
 		);
 		return link_to_linux_err(status);
@@ -2310,9 +2369,33 @@ static int ca8210_set_frame_retries(struct ieee802154_hw *hw, s8 retries)
 	if (status) {
 		dev_err(
 			&priv->spi->dev,
-			"error setting panid, MLME-SET.confirm status = %d",
+			"error setting frame retries, MLME-SET.confirm status = %d",
 			status
 		);
+	}
+	return link_to_linux_err(status);
+}
+
+static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
+{
+	u8 status;
+	struct ca8210_priv *priv = hw->priv;
+
+	status = mlme_set_request_sync(
+		MAC_PROMISCUOUS_MODE,
+		0,
+		1,
+		(const void*)&on,
+		priv->spi
+	);
+	if (status) {
+		dev_err(
+			&priv->spi->dev,
+			"error setting promiscuous mode, MLME-SET.confirm status = %d",
+			status
+		);
+	} else {
+		priv->promiscuous = on;
 	}
 	return link_to_linux_err(status);
 }
@@ -2328,7 +2411,8 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_cca_mode = ca8210_set_cca_mode,
 	.set_cca_ed_level = ca8210_set_cca_ed_level,
 	.set_csma_params = ca8210_set_csma_params,
-	.set_frame_retries = ca8210_set_frame_retries
+	.set_frame_retries = ca8210_set_frame_retries,
+	.set_promiscuous_mode = ca8210_set_promiscuous_mode
 };
 
 /* Test/EVBME Interface */
@@ -2908,6 +2992,7 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 		IEEE802154_HW_AFILT |
 		IEEE802154_HW_OMIT_CKSUM |
 		IEEE802154_HW_FRAME_RETRIES |
+		IEEE802154_HW_PROMISCUOUS |
 		IEEE802154_HW_CSMA_PARAMS;
 	ca8210_hw->phy->flags =
 		WPAN_PHY_FLAG_TXPOWER |
@@ -3068,6 +3153,8 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->hw_registered = false;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
+	priv->promiscuous = false;
+	priv->retries = 0;
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
