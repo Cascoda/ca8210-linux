@@ -2369,7 +2369,7 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 		MAC_PROMISCUOUS_MODE,
 		0,
 		1,
-		(const void*)&on,
+		(const void *)&on,
 		priv->spi
 	);
 	if (status) {
