@@ -865,6 +865,7 @@ static void ca8210_spi_transfer_complete(void *context)
 		}
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
+		msleep(1);
 		ca8210_spi_transfer(
 			priv->spi,
 			retry_buffer,
