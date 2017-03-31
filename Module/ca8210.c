@@ -844,9 +844,9 @@ static void ca8210_spi_transfer_complete(void *context)
 	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
-		cas_ctl->tx_in_buf[0] == SPI_NACK ||
-		(cas_ctl->tx_in_buf[0] == SPI_IDLE &&
-		cas_ctl->tx_in_buf[1] == SPI_NACK)
+		(cas_ctl->tx_in_buf[0] == SPI_NACK ||
+		cas_ctl->tx_in_buf[0] == SPI_IDLE) &&
+		cas_ctl->tx_in_buf[1] == SPI_NACK
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
@@ -866,6 +866,7 @@ static void ca8210_spi_transfer_complete(void *context)
 		}
 		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
+		msleep(1);
 		ca8210_spi_transfer(
 			priv->spi,
 			retry_buffer,
@@ -2385,7 +2386,7 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 		MAC_PROMISCUOUS_MODE,
 		0,
 		1,
-		(const void*)&on,
+		(const void *)&on,
 		priv->spi
 	);
 	if (status) {
