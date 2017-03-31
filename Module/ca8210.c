@@ -843,9 +843,9 @@ static void ca8210_spi_transfer_complete(void *context)
 	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
-		cas_ctl->tx_in_buf[0] == SPI_NACK ||
-		(cas_ctl->tx_in_buf[0] == SPI_IDLE &&
-		cas_ctl->tx_in_buf[1] == SPI_NACK)
+		(cas_ctl->tx_in_buf[0] == SPI_NACK ||
+		cas_ctl->tx_in_buf[0] == SPI_IDLE) &&
+		cas_ctl->tx_in_buf[1] == SPI_NACK
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
