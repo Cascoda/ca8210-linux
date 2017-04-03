@@ -916,14 +916,6 @@ static int ca8210_spi_transfer(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct cas_control *cas_ctl;
 
-	if (!spi) {
-		dev_crit(
-			&spi->dev,
-			"NULL spi device passed to ca8210_spi_transfer\n"
-		);
-		return -ENODEV;
-	}
-
 	reinit_completion(&priv->spi_transfer_complete);
 
 	dev_dbg(&spi->dev, "ca8210_spi_transfer called\n");
