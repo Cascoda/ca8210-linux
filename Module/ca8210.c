@@ -315,6 +315,8 @@ struct cas_control {
  * struct ca8210_test - ca8210 test interface structure
  * @ca8210_dfs_spi_int: pointer to the entry in the debug fs for this device
  * @up_fifo:            fifo for upstream messages
+ * @readq:              used to block on read and notify reader of new data
+ * @is_open:            whether or not a process has the interface open
  *
  * This structure stores all the data pertaining to the debug interface
  */
@@ -322,6 +324,7 @@ struct ca8210_test {
 	struct dentry *ca8210_dfs_spi_int;
 	struct kfifo up_fifo;
 	wait_queue_head_t readq;
+	bool is_open;
 };
 
 /**
@@ -2423,7 +2426,28 @@ static int ca8210_test_int_open(struct inode *inodp, struct file *filp)
 {
 	struct ca8210_priv *priv = inodp->i_private;
 
+	if (priv->test.is_open) {
+		dev_err(&priv->spi->dev, "Debug node already opened!\n");
+		return -EBUSY;
+	}
+
 	filp->private_data = priv;
+	priv->test.is_open = true;
+	return 0;
+}
+
+/**
+ * ca8210_test_int_release() - Called when the test interface is closed
+ * @inodp:  inode representation of file interface
+ * @filp:   file interface
+ *
+ * Return: 0 or linux error code
+ */
+static int ca8210_test_int_release(struct inode *inodp, struct file *filp)
+{
+	struct ca8210_priv *priv = inodp->i_private;
+
+	priv->test.is_open = false;
 	return 0;
 }
 
@@ -2672,7 +2696,7 @@ static const struct file_operations test_int_fops = {
 	.read =           ca8210_test_int_user_read,
 	.write =          ca8210_test_int_user_write,
 	.open =           ca8210_test_int_open,
-	.release =        NULL,
+	.release =        ca8210_test_int_release,
 	.unlocked_ioctl = ca8210_test_int_ioctl,
 	.poll =           ca8210_test_int_poll
 };
