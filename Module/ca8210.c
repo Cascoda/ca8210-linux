@@ -636,6 +636,22 @@ static int ca8210_test_int_driver_write(
 	for (i = 0; i < len; i++)
 		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
 
+	if (kfifo_is_full(&test->up_fifo)) {
+		dev_dbg(
+			&priv->spi->dev,
+			"test_interface: fifo full, discarding oldest entry...\n"
+		);
+		if (kfifo_out(&priv->test.up_fifo, &fifo_buffer,
+				sizeof(fifo_buffer)) != sizeof(fifo_buffer)) {
+			dev_err(
+				&priv->spi->dev,
+				"test_interface: Wrong number of elements popped from upstream fifo\n"
+			);
+			return 0;
+		}
+		kfree(fifo_buffer);
+	}
+
 	fifo_buffer = kmalloc(len, GFP_KERNEL);
 	if (!fifo_buffer)
 		return -ENOMEM;
