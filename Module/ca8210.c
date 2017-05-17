@@ -626,7 +626,7 @@ static int ca8210_test_int_driver_write(
 {
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_test *test = &priv->test;
-	char *fifo_buffer;
+	u8 *fifo_buffer;
 	int i;
 
 	dev_dbg(
@@ -2577,7 +2577,7 @@ static ssize_t ca8210_test_int_user_read(
 {
 	int i, cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
-	unsigned char *fifo_buffer;
+	u8 *fifo_buffer;
 	unsigned long bytes_not_copied;
 
 	if (filp->f_flags & O_NONBLOCK) {
