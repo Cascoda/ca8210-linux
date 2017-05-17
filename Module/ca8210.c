@@ -627,7 +627,7 @@ static int ca8210_test_int_driver_write(
 {
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_test *test = &priv->test;
-	char *fifo_buffer;
+	u8 *fifo_buffer;
 	int i;
 
 	dev_dbg(
@@ -636,6 +636,22 @@ static int ca8210_test_int_driver_write(
 	);
 	for (i = 0; i < len; i++)
 		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
+
+	if (kfifo_is_full(&test->up_fifo)) {
+		dev_dbg(
+			&priv->spi->dev,
+			"test_interface: fifo full, discarding oldest entry...\n"
+		);
+		if (kfifo_out(&priv->test.up_fifo, &fifo_buffer,
+				sizeof(fifo_buffer)) != sizeof(fifo_buffer)) {
+			dev_err(
+				&priv->spi->dev,
+				"test_interface: Wrong number of elements popped from upstream fifo\n"
+			);
+			return 0;
+		}
+		kfree(fifo_buffer);
+	}
 
 	fifo_buffer = kmalloc(len, GFP_KERNEL);
 	if (!fifo_buffer)
@@ -2593,7 +2609,7 @@ static ssize_t ca8210_test_int_user_read(
 {
 	int i, cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
-	unsigned char *fifo_buffer;
+	u8 *fifo_buffer;
 	unsigned long bytes_not_copied;
 
 	if (filp->f_flags & O_NONBLOCK) {
@@ -2608,7 +2624,8 @@ static ssize_t ca8210_test_int_user_read(
 		);
 	}
 
-	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, 4) != 4) {
+	if (kfifo_out(&priv->test.up_fifo, &fifo_buffer, sizeof(fifo_buffer)) !=
+			sizeof(fifo_buffer)) {
 		dev_err(
 			&priv->spi->dev,
 			"test_interface: Wrong number of elements popped from upstream fifo\n"
