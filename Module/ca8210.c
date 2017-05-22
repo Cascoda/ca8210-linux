@@ -3177,10 +3177,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 
 	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
-		dev_crit(
-			&spi_device->dev,
-			"Could not allocate platform data\n"
-		);
 		ret = -ENOMEM;
 		goto error;
 	}
