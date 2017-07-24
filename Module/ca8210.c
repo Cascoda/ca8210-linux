@@ -1084,7 +1084,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 
 	dev_dbg(&priv->spi->dev, "irq: Interrupt occurred\n");
 
-	queue_work(priv->irq_workqueue, priv->irq_work->work);
+	queue_work(priv->irq_workqueue, &priv->irq_work->work);
 
 	return IRQ_HANDLED;
 }
@@ -1103,7 +1103,7 @@ static void ca8210_interrupt_queued (struct work_struct *work)
 		status = ca8210_spi_transfer(wpc->priv->spi, NULL, 0);
 		if (status && (status != -EBUSY)) {
 			dev_warn(
-				&priv->spi->dev,
+				&wpc->priv->spi->dev,
 				"spi read failed, returned %d\n",
 				status
 			);
@@ -2970,7 +2970,7 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	}
 	priv->irq_work = kmalloc(sizeof(*priv->irq_work), GFP_KERNEL);
 	priv->irq_work->priv = priv;
-	INIT_WORK(priv->irq_work->work, &ca8210_interrupt_queued);
+	INIT_WORK(&priv->irq_work->work, &ca8210_interrupt_queued);
 
 	return 0;
 }
