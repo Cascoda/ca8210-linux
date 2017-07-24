@@ -389,6 +389,20 @@ struct work_priv_container {
 };
 
 /**
+ * struct work_data_container - link between a work object, the relevant
+ *                              device's private data and the buffer to be sent
+ * @work: work object being executed
+ * @priv: device's private data section
+ * @tx_buf: a buffer containing the data to be transmitted
+ *
+ */
+struct work_data_container {
+	struct work_struct work;
+	struct ca8210_priv *priv;
+	u8 tx_buf[CA8210_SPI_BUF_SIZE];
+};
+
+/**
  * struct ca8210_platform_data - ca8210 platform data structure
  * @extclockenable: true if the external clock is to be enabled
  * @extclockfreq:   frequency of the external clock
@@ -851,9 +865,21 @@ finish:;
 
 static int ca8210_remove(struct spi_device *spi_device);
 
+static void ca8210_spi_transfer_retry_worker(struct work_struct *work){
+	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
+	struct work_data_container *wdc = container_of(
+			work,
+			struct work_data_container,
+			work
+		);
+
+	ca8210_spi_transfer(wdc->priv->spi, wdc->tx_buf, CA8210_SPI_BUF_SIZE);
+	kfree(wdc);
+}
+
 /**
  * ca8210_spi_transfer_complete() - Called when a single spi transfer has
- *                                  completed
+ *                                  completed (Context which cannot sleep)
  * @context:  Pointer to the cas_control object for the finished transfer
  */
 static void ca8210_spi_transfer_complete(void *context)
@@ -862,7 +888,6 @@ static void ca8210_spi_transfer_complete(void *context)
 	struct ca8210_priv *priv = cas_ctl->priv;
 	bool duplex_rx = false;
 	int i;
-	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 
 	if (
 		(cas_ctl->tx_in_buf[0] == SPI_NACK ||
@@ -879,22 +904,25 @@ static void ca8210_spi_transfer_complete(void *context)
 			kfree(cas_ctl);
 			return;
 		}
-		if (priv->retries > 3) {
+/*		if (priv->retries > 3) {
 			dev_err(&priv->spi->dev, "too many retries!\n");
 			kfree(cas_ctl);
-			ca8210_remove(priv->spi);
+			ca8210_remove(priv->spi); //TODO: Don't do this. Doesn't properly remove and causes crash
 			return;
-		}
-		memcpy(retry_buffer, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
-		kfree(cas_ctl);
-		msleep(1);
-		ca8210_spi_transfer(
-			priv->spi,
-			retry_buffer,
-			CA8210_SPI_BUF_SIZE
+		}*/
+		//Retry
+		struct work_data_container *retry_work;
+		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
+		retry_work->priv = priv;
+		INIT_WORK(
+			&retry_work->work,
+			ca8210_spi_transfer_retry_worker
 		);
+		memcpy(retry_work->tx_buf, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
+		kfree(cas_ctl);
 		priv->retries++;
-		dev_info(&priv->spi->dev, "retried spi write\n");
+		queue_delayed_work(priv->irq_workqueue, retry_work, msecs_to_jiffies(1));
+		dev_info(&priv->spi->dev, "queued spi write retry\n");
 		return;
 	} else if (
 			cas_ctl->tx_in_buf[0] != SPI_IDLE &&
@@ -911,7 +939,7 @@ static void ca8210_spi_transfer_complete(void *context)
 				"%#03x\n",
 				cas_ctl->tx_in_buf[i]
 			);
-		ca8210_rx_done(cas_ctl);
+		ca8210_rx_done(cas_ctl);	//This involves sleeping - not in this context! -> Use a workqueue
 	}
 	complete(&priv->spi_transfer_complete);
 	kfree(cas_ctl);
@@ -1089,7 +1117,7 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void ca8210_interrupt_queued (struct work_struct *work)
+static void ca8210_interrupt_worker (struct work_struct *work)
 {
 	int status;
 
@@ -2970,7 +2998,7 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 	}
 	priv->irq_work = kmalloc(sizeof(*priv->irq_work), GFP_KERNEL);
 	priv->irq_work->priv = priv;
-	INIT_WORK(&priv->irq_work->work, &ca8210_interrupt_queued);
+	INIT_WORK(&priv->irq_work->work, &ca8210_interrupt_worker);
 
 	return 0;
 }
