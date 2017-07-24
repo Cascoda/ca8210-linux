@@ -920,7 +920,7 @@ static void ca8210_spi_transfer_complete(void *context)
 		memcpy(retry_work->tx_buf, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		priv->retries++;
-		queue_delayed_work(priv->irq_workqueue, &retry_work->work, msecs_to_jiffies(1));
+		queue_work(priv->irq_workqueue, &retry_work->work);
 		dev_info(&priv->spi->dev, "queued spi write retry\n");
 		return;
 	} else if (
