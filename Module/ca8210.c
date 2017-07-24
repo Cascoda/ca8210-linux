@@ -866,7 +866,6 @@ finish:;
 static int ca8210_remove(struct spi_device *spi_device);
 
 static void ca8210_spi_transfer_retry_worker(struct work_struct *work){
-	u8 retry_buffer[CA8210_SPI_BUF_SIZE];
 	struct work_data_container *wdc = container_of(
 			work,
 			struct work_data_container,
@@ -886,6 +885,7 @@ static void ca8210_spi_transfer_complete(void *context)
 {
 	struct cas_control *cas_ctl = context;
 	struct ca8210_priv *priv = cas_ctl->priv;
+	struct work_data_container *retry_work;
 	bool duplex_rx = false;
 	int i;
 
@@ -911,7 +911,6 @@ static void ca8210_spi_transfer_complete(void *context)
 			return;
 		}*/
 		//Retry
-		struct work_data_container *retry_work;
 		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
 		retry_work->priv = priv;
 		INIT_WORK(
@@ -921,7 +920,7 @@ static void ca8210_spi_transfer_complete(void *context)
 		memcpy(retry_work->tx_buf, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		priv->retries++;
-		queue_delayed_work(priv->irq_workqueue, retry_work, msecs_to_jiffies(1));
+		queue_delayed_work(priv->irq_workqueue, &retry_work->work, msecs_to_jiffies(1));
 		dev_info(&priv->spi->dev, "queued spi write retry\n");
 		return;
 	} else if (
