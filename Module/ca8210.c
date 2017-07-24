@@ -361,6 +361,7 @@ struct ca8210_priv {
 	spinlock_t lock;
 	struct workqueue_struct *mlme_workqueue;
 	struct workqueue_struct *irq_workqueue;
+	struct work_priv_container *irq_work;
 	struct sk_buff *tx_skb;
 	u8 nextmsduhandle;
 	struct clk *clk;
@@ -1080,11 +1081,26 @@ cleanup:
 static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 {
 	struct ca8210_priv *priv = dev_id;
-	int status;
 
 	dev_dbg(&priv->spi->dev, "irq: Interrupt occurred\n");
+
+	queue_work(priv->irq_workqueue, priv->irq_work->work);
+
+	return IRQ_HANDLED;
+}
+
+static void ca8210_interrupt_queued (struct work_struct *work)
+{
+	int status;
+
+	struct work_priv_container *wpc = container_of(
+			work,
+			struct work_priv_container,
+			work
+		);
+
 	do {
-		status = ca8210_spi_transfer(priv->spi, NULL, 0);
+		status = ca8210_spi_transfer(wpc->priv->spi, NULL, 0);
 		if (status && (status != -EBUSY)) {
 			dev_warn(
 				&priv->spi->dev,
@@ -1093,7 +1109,6 @@ static irqreturn_t ca8210_interrupt_handler(int irq, void *dev_id)
 			);
 		}
 	} while (status == -EBUSY);
-	return IRQ_HANDLED;
 }
 
 static int (*cascoda_api_downstream)(
@@ -2953,6 +2968,9 @@ static int ca8210_dev_com_init(struct ca8210_priv *priv)
 		dev_crit(&priv->spi->dev, "alloc of irq_workqueue failed!\n");
 		return -ENOMEM;
 	}
+	priv->irq_work = kmalloc(sizeof(*priv->irq_work), GFP_KERNEL);
+	priv->irq_work->priv = priv;
+	INIT_WORK(priv->irq_work->work, &ca8210_interrupt_queued);
 
 	return 0;
 }
@@ -2967,6 +2985,7 @@ static void ca8210_dev_com_clear(struct ca8210_priv *priv)
 	destroy_workqueue(priv->mlme_workqueue);
 	flush_workqueue(priv->irq_workqueue);
 	destroy_workqueue(priv->irq_workqueue);
+	kfree(priv->irq_work);
 }
 
 #define CA8210_MAX_TX_POWERS (9)
