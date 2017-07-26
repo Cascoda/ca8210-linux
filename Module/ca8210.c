@@ -397,7 +397,7 @@ struct work_priv_container {
  *
  */
 struct work_data_container {
-	struct work_struct work;
+	struct delayed_work work;
 	struct ca8210_priv *priv;
 	u8 tx_buf[CA8210_SPI_BUF_SIZE];
 };
@@ -907,7 +907,7 @@ static void ca8210_spi_transfer_complete(void *context)
 
 		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
 		retry_work->priv = priv;
-		INIT_WORK(
+		INIT_DELAYED_WORK(
 			&retry_work->work,
 			ca8210_spi_transfer_retry_worker
 		);
