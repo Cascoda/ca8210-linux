@@ -867,7 +867,7 @@ static int ca8210_remove(struct spi_device *spi_device);
 
 static void ca8210_spi_transfer_retry_worker(struct work_struct *work){
 	struct work_data_container *wdc = container_of(
-			work,
+			to_delayed_work(work),
 			struct work_data_container,
 			work
 		);
