@@ -888,6 +888,22 @@ static void ca8210_spi_transfer_complete(void *context)
 	struct work_data_container *retry_work;
 	bool duplex_rx = false;
 
+	dev_dbg(&priv->spi->dev, "spi transfer complete.\n");
+	dev_dbg(&priv->spi->dev, "spi transfer out: \n");
+	print_hex_dump_bytes(
+			"",
+			DUMP_PREFIX_NONE,
+			cas_ctl->tx_buf,
+			CA8210_SPI_BUF_SIZE
+	);
+	dev_dbg(&priv->spi->dev, "spi transfer in: \n");
+	print_hex_dump_bytes(
+			"",
+			DUMP_PREFIX_NONE,
+			cas_ctl->tx_in_buf,
+			CA8210_SPI_BUF_SIZE
+	);
+
 	if (
 		(cas_ctl->tx_in_buf[0] == SPI_NACK ||
 		cas_ctl->tx_in_buf[0] == SPI_IDLE) &&
@@ -926,21 +942,6 @@ static void ca8210_spi_transfer_complete(void *context)
 		) {
 		duplex_rx = true;
 	}
-
-	dev_dbg(&priv->spi->dev, "spi transfer out: \n");
-	print_hex_dump_bytes(
-			"",
-			DUMP_PREFIX_NONE,
-			cas_ctl->tx_buf,
-			CA8210_SPI_BUF_SIZE
-	);
-	dev_dbg(&priv->spi->dev, "spi transfer in: \n");
-	print_hex_dump_bytes(
-			"",
-			DUMP_PREFIX_NONE,
-			cas_ctl->tx_in_buf,
-			CA8210_SPI_BUF_SIZE
-	);
 
 	if (duplex_rx) {
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
