@@ -644,7 +644,6 @@ static int ca8210_test_int_driver_write(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct ca8210_test *test = &priv->test;
 	u8 *fifo_buffer;
-	int i;
 
 	dev_dbg(
 		&priv->spi->dev,
@@ -888,7 +887,6 @@ static void ca8210_spi_transfer_complete(void *context)
 	struct ca8210_priv *priv = cas_ctl->priv;
 	struct work_data_container *retry_work;
 	bool duplex_rx = false;
-	int i;
 
 	if (
 		(cas_ctl->tx_in_buf[0] == SPI_NACK ||
@@ -967,7 +965,7 @@ static int ca8210_spi_transfer(
 	size_t              len
 )
 {
-	int i, status = 0;
+	int status = 0;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct cas_control *cas_ctl;
 
