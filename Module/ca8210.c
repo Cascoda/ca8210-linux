@@ -904,13 +904,7 @@ static void ca8210_spi_transfer_complete(void *context)
 			kfree(cas_ctl);
 			return;
 		}
-/*		if (priv->retries > 3) {
-			dev_err(&priv->spi->dev, "too many retries!\n");
-			kfree(cas_ctl);
-			ca8210_remove(priv->spi); //TODO: Don't do this. Doesn't properly remove and causes crash
-			return;
-		}*/
-		//Retry
+
 		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
 		retry_work->priv = priv;
 		INIT_WORK(
@@ -920,7 +914,11 @@ static void ca8210_spi_transfer_complete(void *context)
 		memcpy(retry_work->tx_buf, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
 		kfree(cas_ctl);
 		priv->retries++;
-		queue_work(priv->irq_workqueue, &retry_work->work);
+		queue_delayed_work(
+			priv->irq_workqueue,
+			&retry_work->work,
+			msecs_to_jiffies(priv->retries)
+		);
 		dev_info(&priv->spi->dev, "queued spi write retry\n");
 		return;
 	} else if (
