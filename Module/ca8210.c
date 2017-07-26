@@ -47,6 +47,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define DEBUG 1
+
 #include <linux/cdev.h>
 #include <linux/clk-provider.h>
 #include <linux/debugfs.h>
@@ -648,8 +650,7 @@ static int ca8210_test_int_driver_write(
 		&priv->spi->dev,
 		"test_interface: Buffering upstream message:\n"
 	);
-	for (i = 0; i < len; i++)
-		dev_dbg(&priv->spi->dev, "%#03x\n", buf[i]);
+	print_hex_dump_bytes("", DUMP_PREFIX_NONE, buf, len);
 
 	if (kfifo_is_full(&test->up_fifo)) {
 		dev_dbg(
@@ -928,14 +929,23 @@ static void ca8210_spi_transfer_complete(void *context)
 		duplex_rx = true;
 	}
 
+	dev_dbg(&priv->spi->dev, "spi transfer out: \n");
+	print_hex_dump_bytes(
+			"",
+			DUMP_PREFIX_NONE,
+			cas_ctl->tx_buf,
+			CA8210_SPI_BUF_SIZE
+	);
+	dev_dbg(&priv->spi->dev, "spi transfer in: \n");
+	print_hex_dump_bytes(
+			"",
+			DUMP_PREFIX_NONE,
+			cas_ctl->tx_in_buf,
+			CA8210_SPI_BUF_SIZE
+	);
+
 	if (duplex_rx) {
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
-		for (i = 0; i < cas_ctl->tx_in_buf[1] + 2; i++)
-			dev_dbg(
-				&priv->spi->dev,
-				"%#03x\n",
-				cas_ctl->tx_in_buf[i]
-			);
 		ca8210_rx_done(cas_ctl);	//This involves sleeping - not in this context! -> Use a workqueue
 	}
 	complete(&priv->spi_transfer_complete);
@@ -974,8 +984,7 @@ static int ca8210_spi_transfer(
 	memset(cas_ctl->tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
 	memcpy(cas_ctl->tx_buf, buf, len);
 
-	for (i = 0; i < len; i++)
-		dev_dbg(&spi->dev, "%#03x\n", cas_ctl->tx_buf[i]);
+	print_hex_dump_bytes("", DUMP_PREFIX_NONE, cas_ctl->tx_buf, len);
 
 	spi_message_init(&cas_ctl->msg);
 
@@ -2668,10 +2677,8 @@ static ssize_t ca8210_test_int_user_read(
 	}
 
 	dev_dbg(&priv->spi->dev, "test_interface: Cmd len = %d\n", cmdlen);
-
 	dev_dbg(&priv->spi->dev, "test_interface: Read\n");
-	for (i = 0; i < cmdlen + 2; i++)
-		dev_dbg(&priv->spi->dev, "%#03x\n", fifo_buffer[i]);
+	print_hex_dump_bytes("", DUMP_PREFIX_NONE, fifo_buffer, cmdlen + 2);
 
 	kfree(fifo_buffer);
 
