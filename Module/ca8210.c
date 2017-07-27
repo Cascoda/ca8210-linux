@@ -887,8 +887,9 @@ static void ca8210_spi_transfer_complete(void *context)
 	struct ca8210_priv *priv = cas_ctl->priv;
 	struct work_data_container *retry_work;
 	bool duplex_rx = false;
+	int status = cas_ctl->msg.status;
 
-	dev_dbg(&priv->spi->dev, "spi transfer complete.\n");
+	dev_dbg(&priv->spi->dev, "spi transfer complete. status: %d\n", status);
 	dev_dbg(&priv->spi->dev, "spi transfer out: \n");
 	print_hex_dump_bytes(
 			"",
