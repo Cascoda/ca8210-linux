@@ -896,7 +896,7 @@ static int ca8210_spi_transfer_complete(void *context)
 
 	if (duplex_rx) {
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
-		ca8210_rx_done(cas_ctl);	//This involves sleeping - not in this context! -> Use a workqueue
+		ca8210_rx_done(cas_ctl);
 	}
 	priv->retries = 0;
 
@@ -2660,11 +2660,6 @@ static unsigned int ca8210_test_int_poll(
 	poll_wait(filp, &priv->test.readq, ptable);
 	if (!kfifo_is_empty(&priv->test.up_fifo))
 		return_flags |= (POLLIN | POLLRDNORM);
-	if (wait_event_interruptible(
-		priv->test.readq,
-		!kfifo_is_empty(&priv->test.up_fifo))) {
-		return POLLERR;
-	}
 	return return_flags;
 }
 
