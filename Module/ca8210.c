@@ -921,6 +921,8 @@ static void ca8210_spi_transfer_complete(void *context)
 			return;
 		}
 
+		//TODO: If too many retries, give up & enter error state
+
 		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
 		retry_work->priv = priv;
 		INIT_DELAYED_WORK(
@@ -933,7 +935,7 @@ static void ca8210_spi_transfer_complete(void *context)
 		queue_delayed_work(
 			priv->irq_workqueue,
 			&retry_work->work,
-			msecs_to_jiffies(priv->retries)
+			msecs_to_jiffies(priv->retries * 10)
 		);
 		dev_info(&priv->spi->dev, "queued spi write retry\n");
 		return;
