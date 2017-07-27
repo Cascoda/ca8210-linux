@@ -373,7 +373,7 @@ struct ca8210_priv {
 	u8 *sync_command_response;
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
-	struct completion spi_transfer_complete, sync_exchange_complete;
+	struct completion sync_exchange_complete;
 	bool promiscuous;
 	int retries;
 };
@@ -865,23 +865,12 @@ finish:;
 
 static int ca8210_remove(struct spi_device *spi_device);
 
-static void ca8210_spi_transfer_retry_worker(struct work_struct *work){
-	struct work_data_container *wdc = container_of(
-			to_delayed_work(work),
-			struct work_data_container,
-			work
-		);
-
-	ca8210_spi_transfer(wdc->priv->spi, wdc->tx_buf, CA8210_SPI_BUF_SIZE);
-	kfree(wdc);
-}
-
 /**
  * ca8210_spi_transfer_complete() - Called when a single spi transfer has
  *                                  completed (Context which cannot sleep)
  * @context:  Pointer to the cas_control object for the finished transfer
  */
-static void ca8210_spi_transfer_complete(void *context)
+static int ca8210_spi_transfer_complete(void *context)
 {
 	struct cas_control *cas_ctl = context;
 	struct ca8210_priv *priv = cas_ctl->priv;
@@ -912,33 +901,7 @@ static void ca8210_spi_transfer_complete(void *context)
 	) {
 		/* ca8210 is busy */
 		dev_info(&priv->spi->dev, "ca8210 was busy during attempted write\n");
-		if (cas_ctl->tx_buf[0] == SPI_IDLE) {
-			dev_warn(
-				&priv->spi->dev,
-				"IRQ servicing NACKd, dropping transfer\n"
-			);
-			kfree(cas_ctl);
-			return;
-		}
-
-		//TODO: If too many retries, give up & enter error state
-
-		retry_work = kmalloc(sizeof(*retry_work), GFP_ATOMIC);
-		retry_work->priv = priv;
-		INIT_DELAYED_WORK(
-			&retry_work->work,
-			ca8210_spi_transfer_retry_worker
-		);
-		memcpy(retry_work->tx_buf, cas_ctl->tx_buf, CA8210_SPI_BUF_SIZE);
-		kfree(cas_ctl);
-		priv->retries++;
-		queue_delayed_work(
-			priv->irq_workqueue,
-			&retry_work->work,
-			msecs_to_jiffies(priv->retries * 10)
-		);
-		dev_info(&priv->spi->dev, "queued spi write retry\n");
-		return;
+		return -EBUSY;
 	} else if (
 			cas_ctl->tx_in_buf[0] != SPI_IDLE &&
 			cas_ctl->tx_in_buf[0] != SPI_NACK
@@ -950,13 +913,11 @@ static void ca8210_spi_transfer_complete(void *context)
 		dev_dbg(&priv->spi->dev, "READ CMD DURING TX\n");
 		ca8210_rx_done(cas_ctl);	//This involves sleeping - not in this context! -> Use a workqueue
 	}
-	complete(&priv->spi_transfer_complete);
-	kfree(cas_ctl);
 	priv->retries = 0;
 }
 
 /**
- * ca8210_spi_transfer() - Initiate duplex spi transfer with ca8210
+ * ca8210_spi_transfer() - Initiate duplex spi transfer with ca8210 - synchronous
  * @spi: Pointer to spi device for transfer
  * @buf: Octet array to send
  * @len: length of the buffer being sent
@@ -971,43 +932,35 @@ static int ca8210_spi_transfer(
 {
 	int status = 0;
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
-	struct cas_control *cas_ctl;
-
-	reinit_completion(&priv->spi_transfer_complete);
+	struct cas_control cas_ctl;
 
 	dev_dbg(&spi->dev, "ca8210_spi_transfer called\n");
 
-	cas_ctl = kmalloc(sizeof(*cas_ctl), GFP_ATOMIC);
-	if (!cas_ctl)
-		return -ENOMEM;
+	cas_ctl.priv = priv;
+	memset(cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
+	memset(cas_ctl.tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
+	memcpy(cas_ctl.tx_buf, buf, len);
 
-	cas_ctl->priv = priv;
-	memset(cas_ctl->tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
-	memset(cas_ctl->tx_in_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
-	memcpy(cas_ctl->tx_buf, buf, len);
+	print_hex_dump_bytes("", DUMP_PREFIX_NONE, cas_ctl.tx_buf, len);
 
-	print_hex_dump_bytes("", DUMP_PREFIX_NONE, cas_ctl->tx_buf, len);
+	spi_message_init(&cas_ctl.msg);
 
-	spi_message_init(&cas_ctl->msg);
-
-	cas_ctl->transfer.tx_nbits = 1; /* 1 MOSI line */
-	cas_ctl->transfer.rx_nbits = 1; /* 1 MISO line */
-	cas_ctl->transfer.speed_hz = 0; /* Use device setting */
-	cas_ctl->transfer.bits_per_word = 0; /* Use device setting */
-	cas_ctl->transfer.tx_buf = cas_ctl->tx_buf;
-	cas_ctl->transfer.rx_buf = cas_ctl->tx_in_buf;
-	cas_ctl->transfer.delay_usecs = 0;
-	cas_ctl->transfer.cs_change = 0;
-	cas_ctl->transfer.len = sizeof(struct mac_message);
-	cas_ctl->msg.complete = ca8210_spi_transfer_complete;
-	cas_ctl->msg.context = cas_ctl;
+	cas_ctl.transfer.tx_nbits = 1; /* 1 MOSI line */
+	cas_ctl.transfer.rx_nbits = 1; /* 1 MISO line */
+	cas_ctl.transfer.speed_hz = 0; /* Use device setting */
+	cas_ctl.transfer.bits_per_word = 0; /* Use device setting */
+	cas_ctl.transfer.tx_buf = cas_ctl.tx_buf;
+	cas_ctl.transfer.rx_buf = cas_ctl.tx_in_buf;
+	cas_ctl.transfer.delay_usecs = 0;
+	cas_ctl.transfer.cs_change = 0;
+	cas_ctl.transfer.len = sizeof(struct mac_message);
 
 	spi_message_add_tail(
-		&cas_ctl->transfer,
-		&cas_ctl->msg
+		&cas_ctl.transfer,
+		&cas_ctl.msg
 	);
 
-	status = spi_async(spi, &cas_ctl->msg);
+	status = spi_sync(spi, &cas_ctl.msg);
 	if (status < 0) {
 		dev_crit(
 			&spi->dev,
@@ -1015,6 +968,7 @@ static int ca8210_spi_transfer(
 			status
 		);
 	}
+	status = ca8210_spi_transfer_complete(&cas_ctl);
 
 	return status;
 }
@@ -1050,7 +1004,6 @@ static int ca8210_spi_exchange(
 	}
 
 	do {
-		reinit_completion(&priv->spi_transfer_complete);
 		status = ca8210_spi_transfer(priv->spi, buf, len);
 		if (status) {
 			dev_warn(
@@ -1062,21 +1015,6 @@ static int ca8210_spi_exchange(
 				continue;
 			if (((buf[0] & SPI_SYN) && response))
 				complete(&priv->sync_exchange_complete);
-			goto cleanup;
-		}
-
-		wait_remaining = wait_for_completion_interruptible_timeout(
-			&priv->spi_transfer_complete,
-			msecs_to_jiffies(1000)
-		);
-		if (wait_remaining == -ERESTARTSYS) {
-			status = -ERESTARTSYS;
-		} else if (wait_remaining == 0) {
-			dev_err(
-				&spi->dev,
-				"SPI downstream transfer timed out!\n"
-			);
-			status = -ETIME;
 			goto cleanup;
 		}
 	} while (status < 0);
@@ -1135,16 +1073,14 @@ static void ca8210_interrupt_worker (struct work_struct *work)
 			work
 		);
 
-	do {
-		status = ca8210_spi_transfer(wpc->priv->spi, NULL, 0);
-		if (status && (status != -EBUSY)) {
-			dev_warn(
-				&wpc->priv->spi->dev,
-				"spi read failed, returned %d\n",
-				status
-			);
-		}
-	} while (status == -EBUSY);
+	status = ca8210_spi_transfer(wpc->priv->spi, NULL, 0);
+	if (status) {
+		dev_warn(
+			&wpc->priv->spi->dev,
+			"spi read failed, returned %d... dropping\n",
+			status
+		);
+	}
 }
 
 static int (*cascoda_api_downstream)(
@@ -1583,8 +1519,8 @@ static u8 mcps_data_request(
 		command.length += sizeof(struct secspec);
 	}
 
-	if (ca8210_spi_transfer(device_ref, &command.command_id,
-				command.length + 2))
+	if(cascoda_api_downstream(&command.command_id, command.length + 2,
+				NULL, device_ref))
 		return MAC_SYSTEM_ERROR;
 
 	return MAC_SUCCESS;
@@ -3215,7 +3151,6 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->promiscuous = false;
 	priv->retries = 0;
 	init_completion(&priv->ca8210_is_awake);
-	init_completion(&priv->spi_transfer_complete);
 	init_completion(&priv->sync_exchange_complete);
 	spi_set_drvdata(priv->spi, priv);
 	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
