@@ -899,6 +899,8 @@ static int ca8210_spi_transfer_complete(void *context)
 		ca8210_rx_done(cas_ctl);	//This involves sleeping - not in this context! -> Use a workqueue
 	}
 	priv->retries = 0;
+
+	return 0;
 }
 
 /**
