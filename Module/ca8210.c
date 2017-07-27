@@ -391,20 +391,6 @@ struct work_priv_container {
 };
 
 /**
- * struct work_data_container - link between a work object, the relevant
- *                              device's private data and the buffer to be sent
- * @work: work object being executed
- * @priv: device's private data section
- * @tx_buf: a buffer containing the data to be transmitted
- *
- */
-struct work_data_container {
-	struct delayed_work work;
-	struct ca8210_priv *priv;
-	u8 tx_buf[CA8210_SPI_BUF_SIZE];
-};
-
-/**
  * struct ca8210_platform_data - ca8210 platform data structure
  * @extclockenable: true if the external clock is to be enabled
  * @extclockfreq:   frequency of the external clock
@@ -874,7 +860,6 @@ static int ca8210_spi_transfer_complete(void *context)
 {
 	struct cas_control *cas_ctl = context;
 	struct ca8210_priv *priv = cas_ctl->priv;
-	struct work_data_container *retry_work;
 	bool duplex_rx = false;
 	int status = cas_ctl->msg.status;
 
@@ -994,6 +979,7 @@ static int ca8210_spi_exchange(
 )
 {
 	int status = 0;
+	int retries = 0;
 	struct spi_device *spi = device_ref;
 	struct ca8210_priv *priv = spi->dev.driver_data;
 	long wait_remaining;
@@ -1006,13 +992,16 @@ static int ca8210_spi_exchange(
 	do {
 		status = ca8210_spi_transfer(priv->spi, buf, len);
 		if (status) {
+			++retries;
 			dev_warn(
 				&spi->dev,
 				"spi write failed, returned %d\n",
 				status
 			);
-			if (status == -EBUSY)
+			if (status == -EBUSY && retries < 10){
+				msleep(10 * retries);
 				continue;
+			}
 			if (((buf[0] & SPI_SYN) && response))
 				complete(&priv->sync_exchange_complete);
 			goto cleanup;
@@ -2577,7 +2566,7 @@ static ssize_t ca8210_test_int_user_read(
 	loff_t       *offp
 )
 {
-	int i, cmdlen;
+	int cmdlen;
 	struct ca8210_priv *priv = filp->private_data;
 	u8 *fifo_buffer;
 	unsigned long bytes_not_copied;
