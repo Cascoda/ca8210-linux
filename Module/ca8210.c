@@ -853,7 +853,7 @@ static int ca8210_remove(struct spi_device *spi_device);
 
 /**
  * ca8210_spi_transfer_complete() - Called when a single spi transfer has
- *                                  completed (Context which cannot sleep)
+ *                                  completed
  * @context:  Pointer to the cas_control object for the finished transfer
  */
 static int ca8210_spi_transfer_complete(void *context)
