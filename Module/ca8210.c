@@ -656,7 +656,7 @@ static int ca8210_test_int_driver_write(
 	if (!fifo_buffer)
 		return -ENOMEM;
 	memcpy(fifo_buffer, buf, len);
-	kfifo_in(&test->up_fifo, &fifo_buffer, 4);
+	kfifo_in(&test->up_fifo, &fifo_buffer, sizeof(fifo_buffer));
 	wake_up_interruptible(&priv->test.readq);
 
 	return 0;
