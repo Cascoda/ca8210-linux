@@ -2020,6 +2020,16 @@ static int ca8210_start(struct ieee802154_hw *hw)
 }
 
 /**
+ * ca8210_stop() - Stops the network driver
+ * @hw:  ieee802154_hw of ca8210 being stopped
+ *
+ * Return: 0 or linux error code
+ */
+static void ca8210_stop(struct ieee802154_hw *hw)
+{
+}
+
+/**
  * ca8210_xmit_async() - Asynchronously transmits a given socket buffer using
  *                       the ca8210
  * @hw:   ieee802154_hw of ca8210 to transmit from
@@ -2367,6 +2377,7 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 
 static const struct ieee802154_ops ca8210_phy_ops = {
 	.start = ca8210_start,
+	.stop = ca8210_stop,
 	.xmit_async = ca8210_xmit_async,
 	.ed = ca8210_get_ed,
 	.set_channel = ca8210_set_channel,
