@@ -343,8 +343,12 @@ struct ca8210_test {
  * @last_dsn:               sequence number of last data packet received, for
  *                           resend detection
  * @test:                   test interface data section for this instance
- * @async_tx_pending:       true if an asynchronous transmission was started and
+ * @sync_tx_pending:        true if a synchronous transmission was started and
  *                           is not complete
+ * @sync_tx_complete:       completion object for a data transmission through
+ *                           the network interface
+ * @sync_tx_status:         status of the data confirm from a synchronous data
+ *                           transmission
  * @sync_command_response:  pointer to buffer to fill with sync response
  * @ca8210_is_awake:        nonzero if ca8210 is initialised, ready for comms
  * @sync_down:              counts number of downstream synchronous commands
@@ -369,7 +373,9 @@ struct ca8210_priv {
 	struct clk *clk;
 	int last_dsn;
 	struct ca8210_test test;
-	bool async_tx_pending;
+	bool sync_tx_pending;
+	struct completion sync_tx_complete;
+	u8 sync_tx_status;
 	u8 *sync_command_response;
 	struct completion ca8210_is_awake;
 	int sync_down, sync_up;
@@ -1726,7 +1732,7 @@ static u8 hwme_get_request_sync(
 /* Network driver operation */
 
 /**
- * ca8210_async_xmit_complete() - Called to announce that an asynchronous
+ * ca8210_sync_xmit_complete() - Called to announce that a synchronous
  *                                transmission has finished
  * @hw:          ieee802154_hw of ca8210 that has finished exchange
  * @msduhandle:  Identifier of transmission that has completed
@@ -1734,7 +1740,7 @@ static u8 hwme_get_request_sync(
  *
  * Return: 0 or linux error code
  */
-static int ca8210_async_xmit_complete(
+static int ca8210_sync_xmit_complete(
 	struct ieee802154_hw  *hw,
 	u8                     msduhandle,
 	u8                     status)
@@ -1751,8 +1757,9 @@ static int ca8210_async_xmit_complete(
 		return -EIO;
 	}
 
-	priv->async_tx_pending = false;
+	priv->sync_tx_pending = false;
 	priv->nextmsduhandle++;
+	priv->sync_tx_status = status;
 
 	if (status) {
 		dev_err(
@@ -1760,12 +1767,8 @@ static int ca8210_async_xmit_complete(
 			"Link transmission unsuccessful, status = %d\n",
 			status
 		);
-		if (status != MAC_TRANSACTION_OVERFLOW) {
-			ieee802154_wake_queue(priv->hw);
-			return 0;
-		}
 	}
-	ieee802154_xmit_complete(priv->hw, priv->tx_skb, true);
+	complete(&priv->sync_tx_complete);
 
 	return 0;
 }
@@ -1908,8 +1911,8 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, u8 *command, size_t len)
 		return ca8210_skb_rx(hw, len - 2, command + 2);
 	} else if (command[0] == SPI_MCPS_DATA_CONFIRM) {
 		status = command[3];
-		if (priv->async_tx_pending) {
-			return ca8210_async_xmit_complete(
+		if (priv->sync_tx_pending) {
+			return ca8210_sync_xmit_complete(
 				hw,
 				command[2],
 				status
@@ -2030,23 +2033,31 @@ static void ca8210_stop(struct ieee802154_hw *hw)
 }
 
 /**
- * ca8210_xmit_async() - Asynchronously transmits a given socket buffer using
+ * ca8210_xmit_sync() - Asynchronously transmits a given socket buffer using
  *                       the ca8210
  * @hw:   ieee802154_hw of ca8210 to transmit from
  * @skb:  Socket buffer to transmit
  *
  * Return: 0 or linux error code
  */
-static int ca8210_xmit_async(struct ieee802154_hw *hw, struct sk_buff *skb)
+static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct ca8210_priv *priv = hw->priv;
 	int status;
 
-	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_async()\n");
+	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_sync()\n");
 
 	priv->tx_skb = skb;
-	priv->async_tx_pending = true;
+	priv->sync_tx_pending = true;
+	reinit_completion(&priv->sync_tx_complete);
 	status = ca8210_skb_tx(skb, priv->nextmsduhandle, priv);
+	if (status)
+		return status;
+	wait_for_completion_interruptible_timeout(
+		&priv->sync_tx_complete,
+		msecs_to_jiffies(8000)
+	);
+	status = link_to_linux_err(priv->sync_tx_status);
 	return status;
 }
 
@@ -2378,7 +2389,7 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 static const struct ieee802154_ops ca8210_phy_ops = {
 	.start = ca8210_start,
 	.stop = ca8210_stop,
-	.xmit_async = ca8210_xmit_async,
+	.xmit_sync = ca8210_xmit_sync,
 	.ed = ca8210_get_ed,
 	.set_channel = ca8210_set_channel,
 	.set_hw_addr_filt = ca8210_set_hw_addr_filt,
@@ -3130,7 +3141,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->spi = spi_device;
 	hw->parent = &spi_device->dev;
 	spin_lock_init(&priv->lock);
-	priv->async_tx_pending = false;
+	priv->sync_tx_pending = false;
 	priv->hw_registered = false;
 	priv->sync_up = 0;
 	priv->sync_down = 0;
@@ -3138,6 +3149,7 @@ static int ca8210_probe(struct spi_device *spi_device)
 	priv->retries = 0;
 	init_completion(&priv->ca8210_is_awake);
 	init_completion(&priv->sync_exchange_complete);
+	init_completion(&priv->sync_tx_complete);
 	spi_set_drvdata(priv->spi, priv);
 	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
 		cascoda_api_upstream = ca8210_test_int_driver_write;
