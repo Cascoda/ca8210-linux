@@ -540,7 +540,7 @@ struct preamble_cfg_sfr {
 	u8 search_symbols       : 2;
 };
 
-static int (*cascoda_api_upstream)(
+static int (*ca821x_api_upstream)(
 	const u8 *buf,
 	size_t len,
 	void *device_ref
@@ -767,13 +767,13 @@ static void ca8210_rx_done(struct cas_control *cas_ctl)
 			memcpy(priv->sync_command_response, buf, len);
 			complete(&priv->sync_exchange_complete);
 		} else {
-			if (cascoda_api_upstream)
-				cascoda_api_upstream(buf, len, priv->spi);
+			if (ca821x_api_upstream)
+				ca821x_api_upstream(buf, len, priv->spi);
 			priv->sync_up++;
 		}
 	} else {
-		if (cascoda_api_upstream)
-			cascoda_api_upstream(buf, len, priv->spi);
+		if (ca821x_api_upstream)
+			ca821x_api_upstream(buf, len, priv->spi);
 	}
 
 	ca8210_net_rx(priv->hw, buf, len);
@@ -1080,7 +1080,7 @@ static void ca8210_interrupt_worker (struct work_struct *work)
 	}
 }
 
-static int (*cascoda_api_downstream)(
+static int (*ca821x_api_downstream)(
 	const u8 *buf,
 	size_t len,
 	u8 *response,
@@ -1115,14 +1115,14 @@ static u8 tdme_setsfr_request_sync(
 	command.pdata.tdme_set_sfr_req.sfr_address = sfr_address;
 	command.pdata.tdme_set_sfr_req.sfr_value   = sfr_value;
 	response.command_id = SPI_IDLE;
-	ret = cascoda_api_downstream(
+	ret = ca821x_api_downstream(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
 		device_ref
 	);
 	if (ret) {
-		dev_crit(&spi->dev, "cascoda_api_downstream returned %d", ret);
+		dev_crit(&spi->dev, "ca821x_api_downstream returned %d", ret);
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -1516,7 +1516,7 @@ static u8 mcps_data_request(
 		command.length += sizeof(struct secspec);
 	}
 
-	if(cascoda_api_downstream(&command.command_id, command.length + 2,
+	if(ca821x_api_downstream(&command.command_id, command.length + 2,
 				NULL, device_ref))
 		return MAC_SYSTEM_ERROR;
 
@@ -1543,12 +1543,12 @@ static u8 mlme_reset_request_sync(
 	command.length = 1;
 	command.pdata.u8param = set_default_pib;
 
-	if (cascoda_api_downstream(
+	if (ca821x_api_downstream(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
 		device_ref)) {
-		dev_err(&spi->dev, "cascoda_api_downstream failed\n");
+		dev_err(&spi->dev, "ca821x_api_downstream failed\n");
 		return MAC_SYSTEM_ERROR;
 	}
 
@@ -1627,7 +1627,7 @@ static u8 mlme_set_request_sync(
 		pib_attribute_length
 	);
 
-	if (cascoda_api_downstream(
+	if (ca821x_api_downstream(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
@@ -1669,7 +1669,7 @@ static u8 hwme_set_request_sync(
 		hw_attribute_length
 	);
 
-	if (cascoda_api_downstream(
+	if (ca821x_api_downstream(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
@@ -1705,7 +1705,7 @@ static u8 hwme_get_request_sync(
 	command.length = 1;
 	command.pdata.hwme_get_req.hw_attribute = hw_attribute;
 
-	if (cascoda_api_downstream(
+	if (ca821x_api_downstream(
 		&command.command_id,
 		command.length + 2,
 		&response.command_id,
@@ -2460,8 +2460,8 @@ static int ca8210_test_check_upstream(u8 *buf, void *device_ref)
 			response[2] = MAC_INVALID_PARAMETER;
 			response[3] = buf[2];
 			response[4] = buf[3];
-			if (cascoda_api_upstream)
-				cascoda_api_upstream(response, 5, device_ref);
+			if (ca821x_api_upstream)
+				ca821x_api_upstream(response, 5, device_ref);
 			return ret;
 		}
 	}
@@ -3152,10 +3152,10 @@ static int ca8210_probe(struct spi_device *spi_device)
 	init_completion(&priv->sync_tx_complete);
 	spi_set_drvdata(priv->spi, priv);
 	if (IS_ENABLED(CONFIG_IEEE802154_CA8210_DEBUGFS)) {
-		cascoda_api_upstream = ca8210_test_int_driver_write;
+		ca821x_api_upstream = ca8210_test_int_driver_write;
 		ca8210_test_interface_init(priv);
 	} else {
-		cascoda_api_upstream = NULL;
+		ca821x_api_upstream = NULL;
 	}
 	ca8210_hw_setup(hw);
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
