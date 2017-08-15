@@ -540,6 +540,7 @@ struct preamble_cfg_sfr {
 	u8 search_symbols       : 2;
 };
 
+/** Function pointer for reporting received commands to upstream API module */
 static int (*ca821x_api_upstream)(
 	const u8 *buf,
 	size_t len,
@@ -2493,7 +2494,7 @@ static int ca8210_test_check_upstream(u8 *buf, void *device_ref)
 		);
 	}
 	return 0;
-} /* End of EVBMECheckSerialCommand() */
+}
 
 /**
  * ca8210_test_int_user_write() - Called by a process in userspace to send a
