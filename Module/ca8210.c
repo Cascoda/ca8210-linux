@@ -928,7 +928,7 @@ static int ca8210_spi_transfer(
 	struct ca8210_priv *priv = spi_get_drvdata(spi);
 	struct cas_control cas_ctl;
 
-	dev_dbg(&spi->dev, "ca8210_spi_transfer called\n");
+	dev_dbg(&spi->dev, "%s called\n", __func__);
 
 	cas_ctl.priv = priv;
 	memset(cas_ctl.tx_buf, SPI_IDLE, CA8210_SPI_BUF_SIZE);
@@ -1893,7 +1893,7 @@ static int ca8210_net_rx(struct ieee802154_hw *hw, u8 *command, size_t len)
 	unsigned long flags;
 	u8 status;
 
-	dev_dbg(&priv->spi->dev, "ca8210_net_rx(), CmdID = %d\n", command[0]);
+	dev_dbg(&priv->spi->dev, "%s, CmdID = %d\n", __func__, command[0]);
 
 	if (command[0] == SPI_MCPS_DATA_INDICATION) {
 		/* Received data */
@@ -1943,7 +1943,7 @@ static int ca8210_skb_tx(
 	struct secspec secspec;
 	unsigned int mac_len;
 
-	dev_dbg(&priv->spi->dev, "ca8210_skb_tx() called\n");
+	dev_dbg(&priv->spi->dev, "%s called\n", __func__);
 
 	/* Get addressing info from skb - ieee802154 layer creates a full
 	 * packet
@@ -2046,7 +2046,7 @@ static int ca8210_xmit_sync(struct ieee802154_hw *hw, struct sk_buff *skb)
 	struct ca8210_priv *priv = hw->priv;
 	int status;
 
-	dev_dbg(&priv->spi->dev, "calling ca8210_xmit_sync()\n");
+	dev_dbg(&priv->spi->dev, "calling %s\n", __func__);
 
 	priv->tx_skb = skb;
 	priv->sync_tx_pending = true;
