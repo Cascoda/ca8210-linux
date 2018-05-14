@@ -323,6 +323,7 @@ struct cas_control {
  */
 struct ca8210_test {
 	struct dentry *ca8210_dfs_spi_int;
+	struct dentry *global_symlink;
 	struct kfifo up_fifo;
 	wait_queue_head_t readq;
 	bool is_open;
@@ -3049,7 +3050,7 @@ static int ca8210_test_interface_init(struct ca8210_priv *priv)
 		);
 		return PTR_ERR(test->ca8210_dfs_spi_int);
 	}
-	debugfs_create_symlink("ca8210", NULL, node_name);
+	test->global_symlink = debugfs_create_symlink("ca8210", NULL, node_name);
 	init_waitqueue_head(&test->readq);
 	return kfifo_alloc(
 		&test->up_fifo,
@@ -3068,6 +3069,7 @@ static void ca8210_test_interface_clear(struct ca8210_priv *priv)
 
 	if (!IS_ERR(test->ca8210_dfs_spi_int))
 		debugfs_remove(test->ca8210_dfs_spi_int);
+	debugfs_remove(test->global_symlink);
 	kfifo_free(&test->up_fifo);
 	dev_info(&priv->spi->dev, "Test interface removed\n");
 }
